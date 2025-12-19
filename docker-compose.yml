@@ -1,0 +1,79 @@
+services:
+  db1:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: auth_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - db1_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  db2:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: flights_db
+    ports:
+      - "3308:3306"
+    volumes:
+      - db2_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  server:
+    build: ./server
+    environment:
+      AUTH_PORT: "5001"
+      DB1_URL: "mysql+pymysql://root:root@db1:3306/auth_db"
+      JWT_SECRET: "supersecret123"
+      LOCK_SECONDS: "60"
+    ports:
+      - "5001:5001"
+    depends_on:
+      db1:
+        condition: service_healthy
+
+  flight-service:
+    build: ./flight-service
+    environment:
+      FLIGHT_PORT: "5002"
+      DB2_URL: "mysql+pymysql://root:root@db2:3306/flights_db"
+      JWT_SECRET: "supersecret123"
+      REDIS_URL: "redis://redis:6379/0"
+    ports:
+      - "5002:5002"
+    depends_on:
+      db2:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  client:
+    build: ./client
+    environment:
+      # NAPOMENA: OVO SE NE "ubrizgava" u već buildovan static UI automatski.
+      # Zato za demo koristi hardkod u UI ili napravi Vite build sa pravim vrednostima (vidi napomenu dole).
+      - DUMMY=1
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+      - flight-service
+
+volumes:
+  db1_data:
+  db2_data:

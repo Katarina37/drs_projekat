@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "*"
+flask-sqlalchemy = "*"
+pymysql = "*"
+python-dotenv = "*"
+flask-jwt-extended = "*"
+flask-cors = "*"
+flask-socketio = "*"
+eventlet = "*"
+redis = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
+python_full_version = "3.9.0"
