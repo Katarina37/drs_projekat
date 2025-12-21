@@ -13,6 +13,9 @@ flask-cors = "*"
 flask-socketio = "*"
 eventlet = "*"
 redis = "*"
+requests = "*"
+reportlab = "*"
+cryptography = "*"
 
 [dev-packages]
 

@@ -1,35 +1,119 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import { ToastContainer } from './components';
+import { RealtimeListener } from './components/RealtimeListener';
+import { MainLayout, AuthLayout, ProtectedRoute } from './components/layout';
+import {
+  LoginPage,
+  RegisterPage,
+  DashboardPage,
+  FlightsPage,
+  MyTicketsPage,
+  ProfilePage,
+  UsersPage,
+  CreateFlightPage,
+  AirlinesPage,
+  PendingFlightsPage,
+  RatingsPage,
+  ManagerFlightsPage,
+} from './pages';
+import { UserRole } from './types';
+
+// Import styles
+import './styles/global.css';
+import './styles/components.css';
+import './styles/layout.css';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <BrowserRouter>
+      <AuthProvider>
+        <ToastProvider>
+          <RealtimeListener />
+          <Routes>
+            {/* Auth Routes */}
+            <Route element={<AuthLayout />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+            </Route>
+
+            {/* Protected Routes */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/flights" element={<FlightsPage />} />
+              <Route path="/my-tickets" element={<MyTicketsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+
+              {/* Manager Routes */}
+              <Route
+                path="/create-flight"
+                element={
+                  <ProtectedRoute roles={[UserRole.MENADZER, UserRole.ADMINISTRATOR]}>
+                    <CreateFlightPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-flights"
+                element={
+                  <ProtectedRoute roles={[UserRole.MENADZER, UserRole.ADMINISTRATOR]}>
+                    <ManagerFlightsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/airlines"
+                element={
+                  <ProtectedRoute roles={[UserRole.MENADZER, UserRole.ADMINISTRATOR]}>
+                    <AirlinesPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Admin Routes */}
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute roles={[UserRole.ADMINISTRATOR]}>
+                    <UsersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pending-flights"
+                element={
+                  <ProtectedRoute roles={[UserRole.ADMINISTRATOR]}>
+                    <PendingFlightsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ratings"
+                element={
+                  <ProtectedRoute roles={[UserRole.ADMINISTRATOR]}>
+                    <RatingsPage />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+
+            {/* Redirects */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+          
+          <ToastContainer />
+        </ToastProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;

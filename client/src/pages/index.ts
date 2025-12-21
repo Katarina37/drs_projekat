@@ -1,0 +1,12 @@
+export { LoginPage } from './LoginPage';
+export { RegisterPage } from './RegisterPage';
+export { DashboardPage } from './DashboardPage';
+export { FlightsPage } from './FlightsPage';
+export { MyTicketsPage } from './MyTicketsPage';
+export { ProfilePage } from './ProfilePage';
+export { UsersPage } from './UsersPage';
+export { CreateFlightPage } from './CreateFlightPage';
+export { AirlinesPage } from './AirlinesPage';
+export { PendingFlightsPage } from './PendingFlightsPage';
+export { RatingsPage } from './RatingsPage';
+export { ManagerFlightsPage } from './ManagerFlightsPage';

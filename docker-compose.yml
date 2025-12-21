@@ -1,6 +1,10 @@
+# docker-compose.yml
+
 services:
+  # MySQL baza podataka 1 - za korisnike (auth_db)
   db1:
     image: mysql:8.0
+    container_name: drs_db1
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: auth_db
@@ -13,9 +17,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - drs_network
 
+  # MySQL baza podataka 2 - za letove (flights_db)
   db2:
     image: mysql:8.0
+    container_name: drs_db2
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: flights_db
@@ -28,32 +36,55 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - drs_network
 
+  # Redis za keširanje i WebSocket message queue
   redis:
     image: redis:7
+    container_name: drs_redis
     ports:
       - "6379:6379"
+    networks:
+      - drs_network
 
+  # Server - autentifikacija i upravljanje korisnicima
   server:
     build: ./server
+    container_name: drs_server
     environment:
       AUTH_PORT: "5001"
       DB1_URL: "mysql+pymysql://root:root@db1:3306/auth_db"
       JWT_SECRET: "supersecret123"
       LOCK_SECONDS: "60"
+      INTERNAL_API_KEY: "internal-secret"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
     ports:
       - "5001:5001"
     depends_on:
       db1:
         condition: service_healthy
+    networks:
+      - drs_network
 
+  # Flight Service - upravljanje letovima
   flight-service:
     build: ./flight-service
+    container_name: drs_flight_service
     environment:
       FLIGHT_PORT: "5002"
       DB2_URL: "mysql+pymysql://root:root@db2:3306/flights_db"
       JWT_SECRET: "supersecret123"
       REDIS_URL: "redis://redis:6379/0"
+      SERVER_URL: "http://server:5001"
+      INTERNAL_API_KEY: "internal-secret"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
     ports:
       - "5002:5002"
     depends_on:
@@ -61,19 +92,29 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      server:
+        condition: service_started
+    networks:
+      - drs_network
 
+  # React klijent
   client:
     build: ./client
+    container_name: drs_client
     environment:
-      # NAPOMENA: OVO SE NE "ubrizgava" u već buildovan static UI automatski.
-      # Zato za demo koristi hardkod u UI ili napravi Vite build sa pravim vrednostima (vidi napomenu dole).
       - DUMMY=1
     ports:
       - "5173:80"
     depends_on:
       - server
       - flight-service
+    networks:
+      - drs_network
 
 volumes:
   db1_data:
   db2_data:
+
+networks:
+  drs_network:
+    driver: bridge
