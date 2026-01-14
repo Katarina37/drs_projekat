@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
+from sqlalchemy.dialects.mysql import LONGTEXT
 from app import db
 
 
@@ -43,8 +44,8 @@ class User(db.Model):
     # Finansije - stanje na računu za kupovinu karata
     stanje_racuna = db.Column(db.Numeric(12, 2), default=0.00, nullable=False)
     
-    # Profilna slika (putanja ili base64)
-    profilna_slika = db.Column(db.Text, nullable=True)
+    # Profilna slika (base64) - LONGTEXT može držati do 4GB
+    profilna_slika = db.Column(LONGTEXT, nullable=True)
     
     # Vremenski podaci
     kreiran = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

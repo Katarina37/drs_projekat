@@ -1,48 +1,8 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Button, Input, Select } from '../components';
-
-// Funkcija za kompresiju slike
-const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-
-        // Smanji dimenzije ako je slika prevelika
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Konvertuj u base64 sa kompresijom
-        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressedBase64);
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
-};
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -61,10 +21,8 @@ export function RegisterPage() {
     ulica: '',
     broj: '',
     stanje_racuna: '',
-    profilna_slika: '',
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
@@ -107,53 +65,6 @@ export function RegisterPage() {
     }
   };
 
-  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setFormData((prev) => ({ ...prev, profilna_slika: '' }));
-      return;
-    }
-
-    // Provjeri veličinu fajla (max 5 MB originalni fajl)
-    if (file.size > 5 * 1024 * 1024) {
-      addToast({
-        type: 'error',
-        title: 'Greška',
-        message: 'Slika je prevelika. Maksimalna veličina je 5 MB.',
-      });
-      e.target.value = ''; // Reset input
-      return;
-    }
-
-    // Provjeri tip fajla
-    if (!file.type.startsWith('image/')) {
-      addToast({
-        type: 'error',
-        title: 'Greška',
-        message: 'Molimo izaberite sliku.',
-      });
-      e.target.value = '';
-      return;
-    }
-
-    setIsImageLoading(true);
-    try {
-      // Kompresuj sliku
-      const compressedBase64 = await compressImage(file, 800, 0.7);
-      setFormData((prev) => ({ ...prev, profilna_slika: compressedBase64 }));
-    } catch (error) {
-      console.error('Error compressing image:', error);
-      addToast({
-        type: 'error',
-        title: 'Greška',
-        message: 'Došlo je do greške pri obradi slike.',
-      });
-      e.target.value = '';
-    } finally {
-      setIsImageLoading(false);
-    }
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
@@ -174,7 +85,6 @@ export function RegisterPage() {
         ulica: registerData.ulica,
         broj: registerData.broj,
         stanje_racuna: Number(registerData.stanje_racuna),
-        profilna_slika: registerData.profilna_slika || undefined,
       });
       
       if (response.success) {
@@ -307,70 +217,21 @@ export function RegisterPage() {
           />
         </div>
 
-        <div className="auth-form-row">
-          <Input
-            label="Stanje računa"
-            type="number"
-            required
-            value={formData.stanje_racuna}
-            onChange={(e) => handleChange('stanje_racuna', e.target.value)}
-            error={errors.stanje_racuna}
-            placeholder="0.00"
-            min="0"
-            step="0.01"
-          />
-          <Input
-            label="Profilna slika"
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            disabled={isImageLoading}
-            helper={
-              isImageLoading 
-                ? 'Učitavanje...' 
-                : formData.profilna_slika 
-                  ? 'Slika je učitana' 
-                  : 'Opcionalno (max 5 MB)'
-            }
-          />
-        </div>
-
-        {/* Prikaz učitane slike */}
-        {formData.profilna_slika && (
-          <div style={{ marginBottom: 'var(--spacing-md)', textAlign: 'center' }}>
-            <img 
-              src={formData.profilna_slika} 
-              alt="Profilna slika" 
-              style={{ 
-                maxWidth: '150px', 
-                maxHeight: '150px', 
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-medium)'
-              }} 
-            />
-            <button 
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, profilna_slika: '' }))}
-              style={{
-                display: 'block',
-                margin: 'var(--spacing-xs) auto 0',
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--color-error)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                textDecoration: 'underline'
-              }}
-            >
-              Ukloni sliku
-            </button>
-          </div>
-        )}
+        <Input
+          label="Stanje računa"
+          type="number"
+          required
+          value={formData.stanje_racuna}
+          onChange={(e) => handleChange('stanje_racuna', e.target.value)}
+          error={errors.stanje_racuna}
+          placeholder="0.00"
+          min="0"
+          step="0.01"
+        />
 
         <Button
           type="submit"
-          isLoading={isLoading || isImageLoading}
-          disabled={isImageLoading}
+          isLoading={isLoading}
           style={{ width: '100%', marginTop: 'var(--spacing-sm)' }}
         >
           Registruj se

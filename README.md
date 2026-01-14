@@ -10,3 +10,8 @@ React klijent, Flask server, Flask flight-service, 2x MySQL baze i Redis.
 ```bash 
 docker compose up --build 
 ``` 
+
+## Admin test podaci
+
+Email: admin@admin.com  
+Lozinka: admin123

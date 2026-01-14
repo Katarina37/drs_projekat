@@ -1,9 +1,15 @@
 # server/app/routes/auth_routes.py
 
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import (
+    create_access_token, 
+    jwt_required, 
+    get_jwt_identity, 
+    get_jwt
+)
 
 from app.services import AuthService, UserService
+from app.services.auth_service import TokenBlacklistService
 from app.dto import RegisterUserDTO, LoginDTO
 
 auth_bp = Blueprint("auth", __name__)
@@ -84,5 +90,24 @@ def profile():
 @auth_bp.route("/logout", methods=["POST"])
 @jwt_required()
 def logout():
-    # JWT je stateless; klijent uklanja token lokalno.
-    return jsonify({"success": True, "message": "Uspesno ste odjavljeni"}), 200
+    """
+    Server-side odjava - dodaje trenutni JWT token na blacklist.
+    Token više neće biti validan čak i ako nije istekao.
+    """
+    try:
+        # Dohvati JTI (JWT ID) iz trenutnog tokena
+        jwt_data = get_jwt()
+        jti = jwt_data.get("jti")
+        
+        if jti:
+            # Dodaj token na blacklist
+            blacklist_service = TokenBlacklistService()
+            blacklist_service.blacklist_token(jti)
+            print(f"[AUTH] Token {jti[:8]}... je dodat na blacklist")
+        
+        return jsonify({"success": True, "message": "Uspešno ste odjavljeni"}), 200
+    except Exception as e:
+        print(f"[AUTH] Greška pri odjavi: {str(e)}")
+        # Čak i ako ne uspemo da blacklistamo token, vratimo uspeh
+        # jer klijent ionako briše token
+        return jsonify({"success": True, "message": "Uspešno ste odjavljeni"}), 200

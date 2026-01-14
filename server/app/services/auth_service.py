@@ -2,6 +2,8 @@
 
 from datetime import datetime, timedelta
 from typing import Tuple, Optional
+import redis
+import os
 
 from flask import current_app
 
@@ -13,6 +15,70 @@ from app.utils import hash_password, verify_password
 
 class AuthService:
     """Service for user auth and registration."""
+
+    # Konstante za lockout
+    MAX_FAILED_ATTEMPTS = 3
+    LOCKOUT_SECONDS = 20  # 20 sekundi za testiranje
+
+    def __init__(self):
+        """Inicijalizacija servisa sa Redis konekcijom."""
+        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+        self.redis_client = redis.from_url(redis_url, decode_responses=True)
+
+    def _get_lockout_key(self, email: str) -> str:
+        """Vraća Redis ključ za lockout."""
+        return f"lockout:{email}"
+
+    def _get_attempts_key(self, email: str) -> str:
+        """Vraća Redis ključ za broj pokušaja."""
+        return f"login_attempts:{email}"
+
+    def _is_locked_out(self, email: str) -> Tuple[bool, int]:
+        """
+        Proverava da li je korisnik zaključan.
+        
+        Returns:
+            Tuple (is_locked, remaining_seconds)
+        """
+        lockout_key = self._get_lockout_key(email)
+        ttl = self.redis_client.ttl(lockout_key)
+        
+        if ttl > 0:
+            return True, ttl
+        return False, 0
+
+    def _record_failed_attempt(self, email: str) -> int:
+        """
+        Beleži neuspešan pokušaj prijave.
+        
+        Returns:
+            Broj preostalih pokušaja pre zaključavanja
+        """
+        attempts_key = self._get_attempts_key(email)
+        
+        # Inkrementiraj broj pokušaja
+        attempts = self.redis_client.incr(attempts_key)
+        
+        # Postavi TTL na ključ ako je prvi pokušaj (resetuje se nakon 5 minuta neaktivnosti)
+        if attempts == 1:
+            self.redis_client.expire(attempts_key, 300)  # 5 minuta
+        
+        # Ako je dostignut maksimum, zaključaj nalog
+        if attempts >= self.MAX_FAILED_ATTEMPTS:
+            lockout_key = self._get_lockout_key(email)
+            self.redis_client.setex(lockout_key, self.LOCKOUT_SECONDS, "1")
+            # Resetuj brojač pokušaja
+            self.redis_client.delete(attempts_key)
+            return 0
+        
+        return self.MAX_FAILED_ATTEMPTS - attempts
+
+    def _clear_failed_attempts(self, email: str) -> None:
+        """Briše sve neuspešne pokušaje nakon uspešne prijave."""
+        attempts_key = self._get_attempts_key(email)
+        lockout_key = self._get_lockout_key(email)
+        self.redis_client.delete(attempts_key)
+        self.redis_client.delete(lockout_key)
 
     def register(self, dto: RegisterUserDTO) -> Tuple[bool, str, Optional[dict]]:
         errors = dto.validate()
@@ -52,91 +118,100 @@ class AuthService:
         if errors:
             return False, ", ".join(errors), None
 
-        lock = self._get_lock(dto.email)
-        if lock and lock.is_locked():
-            remaining_seconds = (lock.zakljucan_do - datetime.utcnow()).total_seconds()
-            remaining_minutes = int(remaining_seconds // 60)
-            remaining_secs = int(remaining_seconds % 60)
-            if remaining_minutes > 0:
-                return False, f"Nalog je zaključan. Pokušajte ponovo za {remaining_minutes} min {remaining_secs} sek.", None
-            else:
-                return False, f"Nalog je zaključan. Pokušajte ponovo za {remaining_secs} sekundi.", None
+        # Proveri da li je nalog zaključan
+        is_locked, remaining_seconds = self._is_locked_out(dto.email)
+        if is_locked:
+            return False, f"Nalog je zaključan. Pokušajte ponovo za {remaining_seconds} sekundi.", None
 
         user = User.query.filter_by(email=dto.email).first()
         
         # Provjeri da li korisnik postoji
         if not user:
-            self._record_attempt(dto.email, ip_address, False)
-            self._increment_lock(dto.email)
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
-            return False, "Korisnik sa ovim emailom ne postoji", None
+            attempts_left = self._record_failed_attempt(dto.email)
+            self._record_login_attempt(dto.email, ip_address, False)
+            
+            if attempts_left == 0:
+                return False, f"Korisnik sa ovim emailom ne postoji. Nalog je zaključan na {self.LOCKOUT_SECONDS} sekundi.", None
+            return False, f"Korisnik sa ovim emailom ne postoji. Preostalo pokušaja: {attempts_left}", None
         
         # Provjeri lozinku
         if not verify_password(dto.password, user.password_hash):
-            self._record_attempt(dto.email, ip_address, False)
-            lock_result = self._increment_lock(dto.email)
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+            attempts_left = self._record_failed_attempt(dto.email)
+            self._record_login_attempt(dto.email, ip_address, False)
             
-            # Provjeri koliko pokušaja je ostalo
-            current_lock = self._get_lock(dto.email)
-            if current_lock and current_lock.broj_pokusaja > 0:
-                attempts_left = 3 - current_lock.broj_pokusaja
-                if attempts_left > 0:
-                    return False, f"Pogrešna lozinka. Preostalo pokušaja: {attempts_left}", None
-                else:
-                    return False, "Pogrešna lozinka. Nalog je zaključan na 1 minut.", None
-            return False, "Pogrešna lozinka", None
+            if attempts_left == 0:
+                return False, f"Pogrešna lozinka. Nalog je zaključan na {self.LOCKOUT_SECONDS} sekundi.", None
+            return False, f"Pogrešna lozinka. Preostalo pokušaja: {attempts_left}", None
 
         if not user.aktivan:
             return False, "Nalog je deaktiviran. Kontaktirajte administratora.", None
 
-        self._record_attempt(dto.email, ip_address, True)
-        self._clear_lock(dto.email)
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return False, f"Greska pri prijavi: {str(e)}", None
+        # Uspešna prijava - očisti sve neuspešne pokušaje
+        self._clear_failed_attempts(dto.email)
+        self._record_login_attempt(dto.email, ip_address, True)
 
         return True, "Prijava uspesna", user
 
-    def _get_lock(self, email: str) -> Optional[AccountLock]:
-        return AccountLock.query.filter_by(email=email).first()
+    def _record_login_attempt(self, email: str, ip_address: Optional[str], success: bool) -> None:
+        """Beleži pokušaj prijave u bazu za audit."""
+        try:
+            attempt = LoginAttempt(
+                email=email,
+                ip_adresa=ip_address,
+                uspesno=success,
+            )
+            db.session.add(attempt)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
-    def _increment_lock(self, email: str) -> None:
-        now = datetime.utcnow()
-        lock = AccountLock.query.filter_by(email=email).first()
 
-        if not lock:
-            lock = AccountLock(email=email, zakljucan_do=now, broj_pokusaja=1)
-            db.session.add(lock)
-        else:
-            if lock.zakljucan_do and lock.zakljucan_do < now:
-                lock.broj_pokusaja = 0
-            lock.broj_pokusaja += 1
+class TokenBlacklistService:
+    """Servis za upravljanje blacklist-om JWT tokena."""
+    
+    def __init__(self):
+        """Inicijalizacija servisa sa Redis konekcijom."""
+        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+        self.redis_client = redis.from_url(redis_url, decode_responses=True)
 
-        if lock.broj_pokusaja >= 3:
-            lock_seconds = int(current_app.config.get("LOCK_SECONDS", 60))
-            lock.zakljucan_do = now + timedelta(seconds=lock_seconds)
-            lock.broj_pokusaja = 0
-        else:
-            lock.zakljucan_do = now
+    def _get_blacklist_key(self, jti: str) -> str:
+        """Vraća Redis ključ za blacklistani token."""
+        return f"token_blacklist:{jti}"
 
-    def _clear_lock(self, email: str) -> None:
-        lock = AccountLock.query.filter_by(email=email).first()
-        if lock:
-            db.session.delete(lock)
+    def blacklist_token(self, jti: str, expires_in: int = 86400) -> bool:
+        """
+        Dodaje token na blacklist.
+        
+        Args:
+            jti: Jedinstveni identifikator tokena
+            expires_in: Vreme u sekundama koliko token ostaje na blacklisti (default 24h)
+        
+        Returns:
+            True ako je uspešno dodato
+        """
+        try:
+            key = self._get_blacklist_key(jti)
+            self.redis_client.setex(key, expires_in, "1")
+            return True
+        except Exception as e:
+            print(f"[TOKEN BLACKLIST] Greška pri blacklistanju tokena: {str(e)}")
+            return False
 
-    def _record_attempt(self, email: str, ip_address: Optional[str], success: bool) -> None:
-        attempt = LoginAttempt(
-            email=email,
-            ip_adresa=ip_address,
-            uspesno=success,
-        )
-        db.session.add(attempt)
+    def is_blacklisted(self, jti: str) -> bool:
+        """
+        Proverava da li je token na blacklisti.
+        
+        Args:
+            jti: Jedinstveni identifikator tokena
+        
+        Returns:
+            True ako je token blacklistovan
+        """
+        try:
+            key = self._get_blacklist_key(jti)
+            return self.redis_client.exists(key) > 0
+        except Exception as e:
+            print(f"[TOKEN BLACKLIST] Greška pri proveri tokena: {str(e)}")
+            # U slučaju greške, pretpostavi da token nije blacklistovan
+            # da ne bi blokirali legitimne korisnike
+            return False

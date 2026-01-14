@@ -111,8 +111,9 @@ export function Sidebar() {
 
         <button
           onClick={handleLogout}
-          className="sidebar-link"
+          className="sidebar-link sidebar-link-danger"
           style={{ marginTop: 'var(--spacing-sm)', width: '100%' }}
+          type="button"
         >
           <LogOut className="sidebar-link-icon" size={20} />
           Odjava

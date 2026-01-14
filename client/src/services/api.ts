@@ -41,7 +41,8 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
   instance.interceptors.response.use(
     (response) => response,
     (error: AxiosError<ApiResponse>) => {
-      if (error.response?.status === 401) {
+      const isAuthLogin = error.config?.url?.includes('auth/login');
+      if (error.response?.status === 401 && !isAuthLogin) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
         window.location.href = '/login';
@@ -59,12 +60,25 @@ const flightApi = createApiInstance(FLIGHT_API_URL);
 // Auth API
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    const response = await serverApi.post<AuthResponse>('/auth/login', credentials);
-    const payload = response.data;
-    if (payload.user && !payload.data) {
-      return { ...payload, data: payload.user };
+    try {
+      const response = await serverApi.post<AuthResponse>('/auth/login', credentials);
+      const payload = response.data;
+      if (payload.user && !payload.data) {
+        return { ...payload, data: payload.user };
+      }
+      return payload;
+    } catch (error) {
+      if (axios.isAxiosError<AuthResponse>(error)) {
+        const payload = error.response?.data;
+        if (payload) {
+          if (payload.user && !payload.data) {
+            return { ...payload, data: payload.user };
+          }
+          return payload;
+        }
+      }
+      return { success: false, message: 'Doslo je do greske. Pokusajte ponovo.' };
     }
-    return payload;
   },
 
   register: async (data: RegisterData): Promise<ApiResponse<User>> => {

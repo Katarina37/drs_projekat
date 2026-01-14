@@ -86,6 +86,15 @@
   color: var(--color-primary);
 }
 
+.sidebar-link-danger {
+  color: var(--color-error);
+}
+
+.sidebar-link-danger:hover {
+  color: var(--color-error);
+  background-color: var(--color-error-light);
+}
+
 .sidebar-link-icon {
   width: 20px;
   height: 20px;

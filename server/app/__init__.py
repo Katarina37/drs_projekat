@@ -1,5 +1,7 @@
+# server/app/__init__.py
+
 import os
-from flask import Flask
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
@@ -43,14 +45,40 @@ def create_app():
     # Redis konfiguracija za WebSocket message queue
     app.config['REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     
-    # Lock duration za neuspešne prijave
-    app.config['LOCK_SECONDS'] = int(os.getenv('LOCK_SECONDS', 60))
+    # Lock duration za neuspešne prijave (više se ne koristi - sada je u auth_service.py)
+    app.config['LOCK_SECONDS'] = int(os.getenv('LOCK_SECONDS', 20))
     
     # Inicijalizacija ekstenzija sa app
     db.init_app(app)
     jwt.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     socketio.init_app(app, message_queue=app.config['REDIS_URL'])
+    
+    # JWT Token Blacklist callback
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        """
+        Callback koji se poziva za svaki zahtev sa JWT tokenom.
+        Proverava da li je token na blacklisti (revociran).
+        """
+        from app.services.auth_service import TokenBlacklistService
+        
+        jti = jwt_payload.get("jti")
+        if not jti:
+            return False
+        
+        blacklist_service = TokenBlacklistService()
+        return blacklist_service.is_blacklisted(jti)
+    
+    @jwt.revoked_token_loader
+    def revoked_token_callback(jwt_header, jwt_payload):
+        """
+        Callback koji se poziva kada je token revociran (na blacklisti).
+        """
+        return jsonify({
+            "success": False,
+            "message": "Token je istekao ili je odjava već izvršena. Molimo prijavite se ponovo."
+        }), 401
     
     # Registracija blueprintova (ruta)
     from app.routes.auth_routes import auth_bp
