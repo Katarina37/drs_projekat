@@ -1,7 +1,10 @@
 # server/run.py
 
+import eventlet
+eventlet.monkey_patch()
+
 import os
-from app import create_app
+from app import create_app, socketio
 
 app = create_app()
 
@@ -10,4 +13,4 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
     
     print(f'[SERVER] Starting on port {port}...')
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug)

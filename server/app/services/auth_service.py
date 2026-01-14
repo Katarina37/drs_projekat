@@ -1,3 +1,5 @@
+# server/app/services/auth_service.py
+
 from datetime import datetime, timedelta
 from typing import Tuple, Optional
 
@@ -31,6 +33,7 @@ class AuthService:
             drzava=dto.drzava,
             ulica=dto.ulica,
             broj=dto.broj,
+            stanje_racuna=dto.stanje_racuna,
             profilna_slika=dto.profilna_slika,
             uloga=UserRole.KORISNIK,
             aktivan=True,
@@ -51,20 +54,47 @@ class AuthService:
 
         lock = self._get_lock(dto.email)
         if lock and lock.is_locked():
-            return False, f"Nalog je zakljucan do {lock.zakljucan_do.isoformat()}", None
+            remaining_seconds = (lock.zakljucan_do - datetime.utcnow()).total_seconds()
+            remaining_minutes = int(remaining_seconds // 60)
+            remaining_secs = int(remaining_seconds % 60)
+            if remaining_minutes > 0:
+                return False, f"Nalog je zaključan. Pokušajte ponovo za {remaining_minutes} min {remaining_secs} sek.", None
+            else:
+                return False, f"Nalog je zaključan. Pokušajte ponovo za {remaining_secs} sekundi.", None
 
         user = User.query.filter_by(email=dto.email).first()
-        if not user or not verify_password(dto.password, user.password_hash):
+        
+        # Provjeri da li korisnik postoji
+        if not user:
             self._record_attempt(dto.email, ip_address, False)
             self._increment_lock(dto.email)
             try:
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-            return False, "Nevalidan email ili lozinka", None
+            return False, "Korisnik sa ovim emailom ne postoji", None
+        
+        # Provjeri lozinku
+        if not verify_password(dto.password, user.password_hash):
+            self._record_attempt(dto.email, ip_address, False)
+            lock_result = self._increment_lock(dto.email)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            
+            # Provjeri koliko pokušaja je ostalo
+            current_lock = self._get_lock(dto.email)
+            if current_lock and current_lock.broj_pokusaja > 0:
+                attempts_left = 3 - current_lock.broj_pokusaja
+                if attempts_left > 0:
+                    return False, f"Pogrešna lozinka. Preostalo pokušaja: {attempts_left}", None
+                else:
+                    return False, "Pogrešna lozinka. Nalog je zaključan na 1 minut.", None
+            return False, "Pogrešna lozinka", None
 
         if not user.aktivan:
-            return False, "Nalog je deaktiviran", None
+            return False, "Nalog je deaktiviran. Kontaktirajte administratora.", None
 
         self._record_attempt(dto.email, ip_address, True)
         self._clear_lock(dto.email)

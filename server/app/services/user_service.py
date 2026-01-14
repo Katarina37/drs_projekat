@@ -6,7 +6,7 @@ from decimal import Decimal
 from app import db
 from app.models import User, UserRole
 from app.dto import UpdateUserDTO, ChangeRoleDTO, DepositDTO
-from app.utils import send_role_change_email
+from app.utils import send_role_change_email, hash_password
 
 
 class UserService:
@@ -69,6 +69,13 @@ class UserService:
             user.ime = dto.ime
         if dto.prezime is not None:
             user.prezime = dto.prezime
+        if dto.email is not None:
+            existing = User.query.filter(User.email == dto.email, User.id != user_id).first()
+            if existing:
+                return False, 'Email vec postoji', None
+            user.email = dto.email
+        if dto.password is not None:
+            user.password_hash = hash_password(dto.password)
         if dto.datum_rodjenja is not None:
             user.datum_rodjenja = dto.datum_rodjenja
         if dto.pol is not None:

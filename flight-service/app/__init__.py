@@ -31,6 +31,7 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET', 'supersecret123')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400  # 24 sata
+    app.config['JWT_VERIFY_SUB'] = False
     
     # Redis konfiguracija za keš
     app.config['REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')

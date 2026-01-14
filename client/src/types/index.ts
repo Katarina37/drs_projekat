@@ -38,6 +38,21 @@ export interface RegisterData {
   drzava: string;
   ulica: string;
   broj: string;
+  stanje_racuna: number;
+  profilna_slika?: string;
+}
+
+export interface UpdateUserData {
+  ime?: string;
+  prezime?: string;
+  email?: string;
+  password?: string;
+  datum_rodjenja?: string;
+  pol?: 'M' | 'Z';
+  drzava?: string;
+  ulica?: string;
+  broj?: string;
+  profilna_slika?: string;
 }
 
 // Flight Types

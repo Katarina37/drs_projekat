@@ -5,6 +5,7 @@ import type {
   User, 
   LoginCredentials, 
   RegisterData,
+  UpdateUserData,
   Flight,
   Airline,
   CreateFlightData,
@@ -94,7 +95,7 @@ export const usersApi = {
     return response.data;
   },
 
-  update: async (id: number, data: Partial<User>): Promise<ApiResponse<User>> => {
+  update: async (id: number, data: UpdateUserData): Promise<ApiResponse<User>> => {
     const response = await serverApi.put<ApiResponse<User>>(`/users/${id}`, data);
     return response.data;
   },

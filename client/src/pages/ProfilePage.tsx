@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { Wallet, Save } from 'lucide-react';
 import { TopHeader } from '../components/layout/TopHeader';
 import { 
@@ -14,16 +14,88 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usersApi } from '../services/api';
+import type { User } from '../types';
+
+// Funkcija za kompresiju slike
+const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Smanji dimenzije ako je slika prevelika
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Konvertuj u base64 sa kompresijom
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedBase64);
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+};
 
 type ProfileFormData = {
   ime: string;
   prezime: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
   datum_rodjenja: string;
   pol: 'M' | 'Z' | '';
   drzava: string;
   ulica: string;
   broj: string;
+  profilna_slika: string;
 };
+
+const emptyFormData: ProfileFormData = {
+  ime: '',
+  prezime: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  datum_rodjenja: '',
+  pol: '',
+  drzava: '',
+  ulica: '',
+  broj: '',
+  profilna_slika: '',
+};
+
+const buildFormData = (currentUser: User | null): ProfileFormData => ({
+  ...emptyFormData,
+  ime: currentUser?.ime || '',
+  prezime: currentUser?.prezime || '',
+  email: currentUser?.email || '',
+  datum_rodjenja: currentUser?.datum_rodjenja || '',
+  pol: currentUser?.pol || '',
+  drzava: currentUser?.drzava || '',
+  ulica: currentUser?.ulica || '',
+  broj: currentUser?.broj || '',
+  profilna_slika: currentUser?.profilna_slika || '',
+});
 
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -31,55 +103,150 @@ export function ProfilePage() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [isDepositing, setIsDepositing] = useState(false);
-  
-  const [formData, setFormData] = useState<ProfileFormData>({
-    ime: user?.ime || '',
-    prezime: user?.prezime || '',
-    datum_rodjenja: user?.datum_rodjenja || '',
-    pol: user?.pol || '',
-    drzava: user?.drzava || '',
-    ulica: user?.ulica || '',
-    broj: user?.broj || '',
-  });
+
+  const [formData, setFormData] = useState<ProfileFormData>(() => buildFormData(user));
+
+  useEffect(() => {
+    if (!user || isEditing) return;
+    setFormData(buildFormData(user));
+  }, [user, isEditing]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setFormData((prev) => ({ ...prev, profilna_slika: '' }));
+      return;
+    }
+
+    // Provjeri veličinu fajla (max 5 MB originalni fajl)
+    if (file.size > 5 * 1024 * 1024) {
+      addToast({
+        type: 'error',
+        title: 'Greška',
+        message: 'Slika je prevelika. Maksimalna veličina je 5 MB.',
+      });
+      e.target.value = ''; // Reset input
+      return;
+    }
+
+    // Provjeri tip fajla
+    if (!file.type.startsWith('image/')) {
+      addToast({
+        type: 'error',
+        title: 'Greška',
+        message: 'Molimo izaberite sliku.',
+      });
+      e.target.value = '';
+      return;
+    }
+
+    setIsImageLoading(true);
+    try {
+      // Kompresuj sliku
+      const compressedBase64 = await compressImage(file, 800, 0.7);
+      setFormData((prev) => ({ ...prev, profilna_slika: compressedBase64 }));
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      addToast({
+        type: 'error',
+        title: 'Greška',
+        message: 'Došlo je do greške pri obradi slike.',
+      });
+      e.target.value = '';
+    } finally {
+      setIsImageLoading(false);
+    }
   };
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
+    if (!formData.email) {
+      addToast({
+        type: 'error',
+        title: 'Greška',
+        message: 'Email je obavezan.',
+      });
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      addToast({
+        type: 'error',
+        title: 'Greška',
+        message: 'Unesite validnu email adresu.',
+      });
+      return;
+    }
+
+    if (formData.password) {
+      if (formData.password.length < 6) {
+        addToast({
+          type: 'error',
+          title: 'Greška',
+          message: 'Lozinka mora imati najmanje 6 karaktera.',
+        });
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        addToast({
+          type: 'error',
+          title: 'Greška',
+          message: 'Lozinke se ne poklapaju.',
+        });
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
-      const payload = {
-        ...formData,
+      const updatePayload = {
+        ime: formData.ime || undefined,
+        prezime: formData.prezime || undefined,
+        email: formData.email || undefined,
+        password: formData.password || undefined,
+        datum_rodjenja: formData.datum_rodjenja || undefined,
         pol: formData.pol === '' ? undefined : formData.pol,
+        drzava: formData.drzava || undefined,
+        ulica: formData.ulica || undefined,
+        broj: formData.broj || undefined,
+        profilna_slika: formData.profilna_slika || undefined,
       };
-      const response = await usersApi.update(user.id, payload);
       
-      if (response.success && response.data) {
-        updateUser(response.data);
-        addToast({
-          type: 'success',
-          title: 'Profil ažuriran',
-          message: 'Vaši podaci su uspešno sačuvani.',
-        });
-        setIsEditing(false);
-      } else {
+      const response = await usersApi.update(user.id, updatePayload);
+
+      if (!response.success || !response.data) {
         addToast({
           type: 'error',
           title: 'Greška',
           message: response.message || 'Nije moguće sačuvati promene.',
         });
+        return;
       }
-    } catch (error) {
+
+      const updatedUser = response.data;
+      updateUser(updatedUser);
+      setFormData(buildFormData(updatedUser));
+      addToast({
+        type: 'success',
+        title: 'Profil ažuriran',
+        message: 'Vaši podaci su uspešno sačuvani.',
+      });
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error('Update error:', error);
       addToast({
         type: 'error',
         title: 'Greška',
-        message: 'Došlo je do greške.',
+        message: error?.response?.data?.message || 'Došlo je do greške.',
       });
     } finally {
       setIsLoading(false);
@@ -121,11 +288,11 @@ export function ProfilePage() {
           message: response.message || 'Nije moguće izvršiti uplatu.',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       addToast({
         type: 'error',
         title: 'Greška',
-        message: 'Došlo je do greške.',
+        message: error?.response?.data?.message || 'Došlo je do greške.',
       });
     } finally {
       setIsDepositing(false);
@@ -155,7 +322,7 @@ export function ProfilePage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-lg)', marginBottom: 'var(--spacing-xl)' }}>
                 <Avatar 
                   name={`${user.ime} ${user.prezime}`} 
-                  src={user.profilna_slika}
+                  src={isEditing ? (formData.profilna_slika || user.profilna_slika) : user.profilna_slika}
                   size="xl"
                 />
                 <div>
@@ -181,6 +348,12 @@ export function ProfilePage() {
                       onChange={(e) => handleChange('prezime', e.target.value)}
                     />
                     <Input
+                      label="Email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleChange('email', e.target.value)}
+                    />
+                    <Input
                       label="Datum rođenja"
                       type="date"
                       value={formData.datum_rodjenja}
@@ -195,6 +368,39 @@ export function ProfilePage() {
                         { value: 'Z', label: 'Ženski' },
                       ]}
                     />
+                    <div>
+                      <Input
+                        label="Profilna slika"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        disabled={isImageLoading}
+                        helper={
+                          isImageLoading 
+                            ? 'Učitavanje...' 
+                            : formData.profilna_slika 
+                              ? 'Slika je učitana' 
+                              : 'Opcionalno (max 5 MB)'
+                        }
+                      />
+                      {formData.profilna_slika && (
+                        <button 
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, profilna_slika: '' }))}
+                          style={{
+                            marginTop: 'var(--spacing-xs)',
+                            fontSize: 'var(--font-size-xs)',
+                            color: 'var(--color-error)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          Ukloni sliku
+                        </button>
+                      )}
+                    </div>
                     <Input
                       label="Država"
                       value={formData.drzava}
@@ -212,13 +418,39 @@ export function ProfilePage() {
                         onChange={(e) => handleChange('broj', e.target.value)}
                       />
                     </div>
+                    <Input
+                      label="Nova lozinka"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => handleChange('password', e.target.value)}
+                      placeholder="••••••••"
+                    />
+                    <Input
+                      label="Potvrda lozinke"
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                      placeholder="••••••••"
+                    />
                   </div>
                   
                   <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-lg)' }}>
-                    <Button type="submit" isLoading={isLoading} leftIcon={<Save size={18} />}>
+                    <Button 
+                      type="submit" 
+                      isLoading={isLoading} 
+                      disabled={isImageLoading}
+                      leftIcon={<Save size={18} />}
+                    >
                       Sačuvaj
                     </Button>
-                    <Button variant="secondary" onClick={() => setIsEditing(false)}>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => {
+                        setFormData(buildFormData(user));
+                        setIsEditing(false);
+                      }}
+                    >
                       Otkaži
                     </Button>
                   </div>
@@ -275,14 +507,16 @@ export function ProfilePage() {
                   onChange={(e) => setDepositAmount(e.target.value)}
                   min="0"
                   step="0.01"
+                  style={{ flex: 1 }}
                 />
-                <Button onClick={handleDeposit} isLoading={isDepositing}>
+                <Button
+                  onClick={handleDeposit}
+                  isLoading={isDepositing}
+                  disabled={!depositAmount || isDepositing}
+                >
                   Uplati
                 </Button>
               </div>
-              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: 'var(--spacing-sm)' }}>
-                * Ovo je simulacija uplate za potrebe testiranja.
-              </p>
             </CardBody>
           </Card>
         </div>

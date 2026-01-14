@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, date
+from decimal import Decimal, InvalidOperation
 from typing import Optional, List
 
 from app.models import UserRole
@@ -30,6 +31,22 @@ def _clean_str(value) -> Optional[str]:
     return value or None
 
 
+def _parse_decimal(value) -> Optional[Decimal]:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, (int, float, str)):
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return Decimal(text)
+        except (InvalidOperation, ValueError):
+            return None
+    return None
+
+
 @dataclass
 class RegisterUserDTO:
     ime: str
@@ -41,6 +58,7 @@ class RegisterUserDTO:
     drzava: str
     ulica: str
     broj: str
+    stanje_racuna: Optional[Decimal]
     profilna_slika: Optional[str] = None
 
     @classmethod
@@ -55,6 +73,7 @@ class RegisterUserDTO:
             drzava=(data.get("drzava") or "").strip(),
             ulica=(data.get("ulica") or "").strip(),
             broj=(data.get("broj") or "").strip(),
+            stanje_racuna=_parse_decimal(data.get("stanje_racuna")),
             profilna_slika=data.get("profilna_slika"),
         )
 
@@ -79,6 +98,10 @@ class RegisterUserDTO:
             errors.append("Ulica je obavezna")
         if not self.broj:
             errors.append("Broj je obavezan")
+        if self.stanje_racuna is None:
+            errors.append("Stanje racuna je obavezno")
+        elif self.stanje_racuna < 0:
+            errors.append("Stanje racuna ne sme biti negativno")
 
         return errors
 
@@ -108,6 +131,8 @@ class LoginDTO:
 class UpdateUserDTO:
     ime: Optional[str] = None
     prezime: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
     datum_rodjenja: Optional[date] = None
     pol: Optional[str] = None
     drzava: Optional[str] = None
@@ -118,9 +143,12 @@ class UpdateUserDTO:
     @classmethod
     def from_dict(cls, data: dict) -> "UpdateUserDTO":
         pol = _clean_str(data.get("pol"))
+        email = _clean_str(data.get("email"))
         return cls(
             ime=_clean_str(data.get("ime")),
             prezime=_clean_str(data.get("prezime")),
+            email=email.lower() if email else None,
+            password=_clean_str(data.get("password")),
             datum_rodjenja=_parse_date(data.get("datum_rodjenja")),
             pol=pol.upper() if pol else None,
             drzava=_clean_str(data.get("drzava")),
@@ -136,6 +164,10 @@ class UpdateUserDTO:
             errors.append("Ime mora imati najmanje 2 karaktera")
         if self.prezime is not None and len(self.prezime) < 2:
             errors.append("Prezime mora imati najmanje 2 karaktera")
+        if self.email is not None and "@" not in self.email:
+            errors.append("Email nije validan")
+        if self.password is not None and len(self.password) < 6:
+            errors.append("Lozinka mora imati najmanje 6 karaktera")
         if self.pol is not None and self.pol not in ("M", "Z"):
             errors.append("Pol mora biti M ili Z")
 

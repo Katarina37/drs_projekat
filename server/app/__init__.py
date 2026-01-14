@@ -1,10 +1,9 @@
-# server/app/__init__.py
-
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
+from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
 # Učitavanje environment varijabli
@@ -13,6 +12,7 @@ load_dotenv()
 # Inicijalizacija ekstenzija
 db = SQLAlchemy()
 jwt = JWTManager()
+socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
 
 
 def create_app():
@@ -29,12 +29,19 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET', 'supersecret123')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400  # 24 sata
+    app.config['JWT_VERIFY_SUB'] = False
+    
+    # DODANO: Povećan limit za upload slika (16 MB)
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
     
     # SMTP konfiguracija za email
     app.config['SMTP_HOST'] = os.getenv('SMTP_HOST', 'smtp.gmail.com')
     app.config['SMTP_PORT'] = int(os.getenv('SMTP_PORT', 587))
     app.config['SMTP_USER'] = os.getenv('SMTP_USER', '')
     app.config['SMTP_PASSWORD'] = os.getenv('SMTP_PASSWORD', '')
+
+    # Redis konfiguracija za WebSocket message queue
+    app.config['REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     
     # Lock duration za neuspešne prijave
     app.config['LOCK_SECONDS'] = int(os.getenv('LOCK_SECONDS', 60))
@@ -43,6 +50,7 @@ def create_app():
     db.init_app(app)
     jwt.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
+    socketio.init_app(app, message_queue=app.config['REDIS_URL'])
     
     # Registracija blueprintova (ruta)
     from app.routes.auth_routes import auth_bp
@@ -52,6 +60,10 @@ def create_app():
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(user_bp, url_prefix='/api/users')
     app.register_blueprint(internal_bp, url_prefix='/api/internal')
+
+    # Registracija WebSocket handlera
+    from app.routes import websocket_handlers
+    websocket_handlers.register_handlers(socketio)
     
     # Kreiranje tabela
     with app.app_context():

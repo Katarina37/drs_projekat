@@ -11,7 +11,16 @@ auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    data = request.get_json() or {}
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Greška pri parsiranju podataka: {str(e)}"}), 400
+    
+    # Validacija profilne slike - ako je prevelika, odbaci je
+    profilna_slika = data.get('profilna_slika')
+    if profilna_slika and len(profilna_slika) > 10 * 1024 * 1024:  # 10 MB limit za base64
+        return jsonify({"success": False, "message": "Slika je prevelika. Maksimalna veličina je 10 MB."}), 400
+    
     dto = RegisterUserDTO.from_dict(data)
     service = AuthService()
 
