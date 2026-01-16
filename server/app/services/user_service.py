@@ -120,17 +120,21 @@ class UserService:
             return False, 'Korisnik nije pronađen', None
         
         # Provera da ne menja drugog admina
+       
         if user.uloga == UserRole.ADMINISTRATOR:
             return False, 'Ne možete promeniti ulogu drugog administratora', None
-        
         stara_uloga = user.uloga.value
         user.uloga = UserRole(dto.nova_uloga)
-        
+        nova_uloga = UserRole(dto.nova_uloga)
+        if nova_uloga == stara_uloga:
+            return False, 'Ne možete promeniti ulogu u vec postojecu ', None
         try:
             db.session.commit()
             
             # Slanje email obaveštenja o promeni uloge
-            send_role_change_email(user.email, user.ime, dto.nova_uloga)
+            if user.uloga == UserRole.MENADZER:
+                send_role_change_email(user.email, user.ime, dto.nova_uloga)
+            
             
             return True, f'Uloga promenjena iz {stara_uloga} u {dto.nova_uloga}', user.to_dict()
         except Exception as e:
