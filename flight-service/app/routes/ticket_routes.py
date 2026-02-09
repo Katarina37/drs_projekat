@@ -35,7 +35,7 @@ def _fetch_user_data(user_id: int):
 @jwt_required()
 def buy_ticket():
     identity = get_jwt_identity() or {}
-    if not _role_check("KORISNIK", "MENADZER"):
+    if not _role_check("KORISNIK", "MENADZER", "ADMINISTRATOR"):
         return jsonify({"success": False, "message": "Pristup odbijen"}), 403
 
     data = request.get_json() or {}
