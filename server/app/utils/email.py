@@ -1,12 +1,16 @@
 # server/app/utils/email.py
 
 import smtplib
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from typing import Optional
 import os
 from multiprocessing import Process
+
+MAX_RETRIES = 3
+RETRY_DELAY = 5  # sekundi izmedju pokusaja
 
 
 def send_email_async(to_email: str, subject: str, body: str, attachment: Optional[bytes] = None, attachment_name: Optional[str] = None):
@@ -57,14 +61,23 @@ def _send_email(to_email: str, subject: str, body: str, attachment: Optional[byt
             part['Content-Disposition'] = f'attachment; filename="{attachment_name}"'
             msg.attach(part)
         
-        # Slanje emaila
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-        
-        print(f"[EMAIL] Uspešno poslat email na {to_email}")
-        
+        # Slanje emaila sa retry mehanizmom
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                with smtplib.SMTP(smtp_host, smtp_port) as server:
+                    server.starttls()
+                    server.login(smtp_user, smtp_password)
+                    server.send_message(msg)
+
+                print(f"[EMAIL] Uspešno poslat email na {to_email}")
+                return
+            except Exception as e:
+                print(f"[EMAIL] Pokušaj {attempt}/{MAX_RETRIES} neuspešan za {to_email}: {str(e)}")
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_DELAY * attempt)
+
+        print(f"[EMAIL] Svi pokušaji neuspešni za {to_email}")
+
     except Exception as e:
         print(f"[EMAIL] Greška pri slanju emaila: {str(e)}")
 

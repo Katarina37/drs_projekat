@@ -8,6 +8,7 @@ import requests
 from app import socketio
 from app.services import FlightService
 from app.utils.report_generator import generate_flights_report_async
+from app.utils.email_sender import send_flight_cancelled_emails
 from app.dto import (
     CreateFlightDTO,
     UpdateFlightDTO,
@@ -277,6 +278,10 @@ def cancel_flight():
         if not _refund_balance(user_id, amount):
             refund_failures.append(user_id)
 
+    # Slanje email obavjestenja korisnicima o otkazanom letu
+    if refunds and flight_data:
+        send_flight_cancelled_emails(refunds, flight_data)
+
     response = {"success": True, "message": message, "data": flight_data}
     if refund_failures:
         response["refund_failures"] = refund_failures
@@ -302,6 +307,10 @@ def cancel_flight_by_id(flight_id: int):
     for user_id, amount in refunds:
         if not _refund_balance(user_id, amount):
             refund_failures.append(user_id)
+
+    # Slanje email obavjestenja korisnicima o otkazanom letu
+    if refunds and flight_data:
+        send_flight_cancelled_emails(refunds, flight_data)
 
     response = {"success": True, "message": message, "data": flight_data}
     if refund_failures:

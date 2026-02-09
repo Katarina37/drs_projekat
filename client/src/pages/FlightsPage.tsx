@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plane } from 'lucide-react';
+import { Plane, FileText } from 'lucide-react';
 import { TopHeader } from '../components/layout/TopHeader';
-import { 
-  FlightCard, 
-  Tabs, 
-  SearchBar, 
-  Select, 
-  EmptyState, 
+import {
+  FlightCard,
+  Tabs,
+  SearchBar,
+  Select,
+  EmptyState,
   Spinner,
   Modal,
   Button,
@@ -17,12 +17,14 @@ import { flightsApi, airlinesApi, ticketsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import type { Flight, Airline, TabItem } from '../types';
+import { UserRole } from '../types';
 import { createSocket } from '../services/socket';
 
 export function FlightsPage() {
   const { user } = useAuth();
   const { addToast } = useToast();
-  
+  const isAdmin = user?.uloga === UserRole.ADMINISTRATOR;
+
   const [activeTab, setActiveTab] = useState('upcoming');
   const [upcomingFlights, setUpcomingFlights] = useState<Flight[]>([]);
   const [inProgressFlights, setInProgressFlights] = useState<Flight[]>([]);
@@ -31,9 +33,14 @@ export function FlightsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAirline, setSelectedAirline] = useState('');
-  
+
   const [bookingModal, setBookingModal] = useState<Flight | null>(null);
   const [isBooking, setIsBooking] = useState(false);
+
+  const [cancelModal, setCancelModal] = useState<Flight | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -53,8 +60,8 @@ export function FlightsPage() {
       console.error('Error loading flights:', error);
       addToast({
         type: 'error',
-        title: 'Greška',
-        message: 'Nije moguće učitati letove.',
+        title: 'Greska',
+        message: 'Nije moguce ucitati letove.',
       });
     } finally {
       setIsLoading(false);
@@ -64,6 +71,11 @@ export function FlightsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Ponovo ucitaj podatke kad korisnik promeni tab
+  useEffect(() => {
+    loadData();
+  }, [activeTab, loadData]);
 
   useEffect(() => {
     const socket = createSocket('/flights');
@@ -90,12 +102,31 @@ export function FlightsPage() {
       loadData();
     };
 
+    const handleStatusChanged = (payload: { flight?: Flight }) => {
+      if (payload?.flight) {
+        addToast({
+          type: 'info',
+          title: 'Status leta promenjen',
+          message: `${payload.flight.naziv} - ${payload.flight.status}`,
+        });
+      }
+      loadData();
+    };
+
+    const handleTicketPurchased = () => {
+      loadData();
+    };
+
     socket.on('flight_approved', handleApproved);
     socket.on('flight_cancelled', handleCancelled);
+    socket.on('flight_status_changed', handleStatusChanged);
+    socket.on('ticket_purchased', handleTicketPurchased);
 
     return () => {
       socket.off('flight_approved', handleApproved);
       socket.off('flight_cancelled', handleCancelled);
+      socket.off('flight_status_changed', handleStatusChanged);
+      socket.off('ticket_purchased', handleTicketPurchased);
       socket.disconnect();
     };
   }, [addToast, loadData]);
@@ -105,9 +136,9 @@ export function FlightsPage() {
       const matchesSearch = flight.naziv.toLowerCase().includes(searchTerm.toLowerCase()) ||
         flight.aerodrom_polaska.toLowerCase().includes(searchTerm.toLowerCase()) ||
         flight.aerodrom_dolaska.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       const matchesAirline = !selectedAirline || flight.airline_id === Number(selectedAirline);
-      
+
       return matchesSearch && matchesAirline;
     });
   };
@@ -119,7 +150,7 @@ export function FlightsPage() {
       addToast({
         type: 'error',
         title: 'Nedovoljno sredstava',
-        message: 'Nemate dovoljno sredstava na računu za ovu rezervaciju.',
+        message: 'Nemate dovoljno sredstava na racunu za ovu rezervaciju.',
       });
       return;
     }
@@ -127,29 +158,99 @@ export function FlightsPage() {
     setIsBooking(true);
     try {
       const response = await ticketsApi.buyTicket(bookingModal.id);
-      
+
       if (response.success) {
         addToast({
           type: 'info',
           title: 'Kupovina je u toku',
-          message: response.message || 'Rezervacija se obrađuje. Bićete obavešteni kada bude završena.',
+          message: response.message || 'Rezervacija se obradjuje. Bicete obavesteni kada bude zavrsena.',
         });
         setBookingModal(null);
       } else {
         addToast({
           type: 'error',
-          title: 'Greška',
-          message: response.message || 'Nije moguće rezervisati let.',
+          title: 'Greska',
+          message: response.message || 'Nije moguce rezervisati let.',
         });
       }
-    } catch (error) {
+    } catch {
       addToast({
         type: 'error',
-        title: 'Greška',
-        message: 'Došlo je do greške prilikom rezervacije.',
+        title: 'Greska',
+        message: 'Doslo je do greske prilikom rezervacije.',
       });
     } finally {
       setIsBooking(false);
+    }
+  };
+
+  const handleCancelFlight = async () => {
+    if (!cancelModal) return;
+
+    setIsCancelling(true);
+    try {
+      const response = await flightsApi.cancel(cancelModal.id);
+
+      if (response.success) {
+        addToast({
+          type: 'success',
+          title: 'Let otkazan',
+          message: `Let ${cancelModal.naziv} je uspjesno otkazan.`,
+        });
+        setCancelModal(null);
+        loadData();
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Greska',
+          message: response.message || 'Nije moguce otkazati let.',
+        });
+      }
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Greska',
+        message: 'Doslo je do greske prilikom otkazivanja leta.',
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    const reportTypeMap: Record<string, string> = {
+      'upcoming': 'upcoming',
+      'in-progress': 'in_progress',
+      'finished': 'finished',
+    };
+    const reportType = reportTypeMap[activeTab];
+    if (!reportType) return;
+
+    setIsGeneratingReport(true);
+    try {
+      const response = await flightsApi.generateReport(reportType);
+
+      if (response.success) {
+        addToast({
+          type: 'success',
+          title: 'Izvjestaj generisan',
+          message: response.message || 'PDF izvjestaj je poslat na vas email.',
+        });
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Greska',
+          message: response.message || 'Nije moguce generisati izvjestaj.',
+        });
+      }
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Greska',
+        message: 'Doslo je do greske prilikom generisanja izvjestaja.',
+      });
+    } finally {
+      setIsGeneratingReport(false);
     }
   };
 
@@ -167,9 +268,9 @@ export function FlightsPage() {
   };
 
   const tabs: TabItem[] = [
-    { id: 'upcoming', label: 'Predstojeći', count: upcomingFlights.length },
+    { id: 'upcoming', label: 'Predstojeci', count: upcomingFlights.length },
     { id: 'in-progress', label: 'U toku', count: inProgressFlights.length },
-    { id: 'finished', label: 'Završeni', count: finishedFlights.length },
+    { id: 'finished', label: 'Zavrseni', count: finishedFlights.length },
   ];
 
   const currentFlights = getCurrentFlights();
@@ -183,24 +284,37 @@ export function FlightsPage() {
             <div>
               <h2>Pregled letova</h2>
               <p className="page-subtitle">
-                Pronađite i rezervišite letove koji vam odgovaraju.
+                Pronadjite i rezervisite letove koji vam odgovaraju.
               </p>
             </div>
+            {/* PDF Report button za administratora */}
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                onClick={handleGenerateReport}
+                isLoading={isGeneratingReport}
+                leftIcon={<FileText size={16} />}
+              >
+                Generiši PDF izvještaj
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Filters */}
         <div className="filters-bar">
           <SearchBar
-            placeholder="Pretraži letove..."
+            placeholder="Pretrazi letove..."
             value={searchTerm}
             onSearch={setSearchTerm}
           />
           <Select
             value={selectedAirline}
             onChange={(e) => setSelectedAirline(e.target.value)}
-            placeholder="Sve avio kompanije"
-            options={airlines.map((a) => ({ value: a.id, label: a.naziv }))}
+            options={[
+              { value: '', label: 'Sve avio kompanije' },
+              ...airlines.map((a) => ({ value: a.id, label: a.naziv })),
+            ]}
             style={{ minWidth: '200px' }}
           />
         </div>
@@ -219,8 +333,10 @@ export function FlightsPage() {
               <FlightCard
                 key={flight.id}
                 flight={flight}
-                onBook={activeTab === 'upcoming' ? setBookingModal : undefined}
-                showActions={activeTab === 'upcoming'}
+                onBook={activeTab === 'upcoming' && new Date(flight.vreme_polaska) > new Date() ? setBookingModal : undefined}
+                onCancel={activeTab === 'upcoming' && isAdmin ? setCancelModal : undefined}
+                showActions={activeTab === 'upcoming' && new Date(flight.vreme_polaska) > new Date()}
+                showCountdown={activeTab === 'in-progress'}
               />
             ))}
           </div>
@@ -232,7 +348,7 @@ export function FlightsPage() {
                 title="Nema letova"
                 description={
                   searchTerm || selectedAirline
-                    ? 'Nema letova koji odgovaraju vašoj pretrazi.'
+                    ? 'Nema letova koji odgovaraju vasoj pretrazi.'
                     : 'Trenutno nema dostupnih letova u ovoj kategoriji.'
                 }
               />
@@ -248,7 +364,7 @@ export function FlightsPage() {
           footer={
             <>
               <Button variant="secondary" onClick={() => setBookingModal(null)}>
-                Otkaži
+                Otkazi
               </Button>
               <Button onClick={handleBookFlight} isLoading={isBooking}>
                 Potvrdi rezervaciju
@@ -259,9 +375,9 @@ export function FlightsPage() {
           {bookingModal && (
             <div>
               <p style={{ marginBottom: 'var(--spacing-lg)' }}>
-                Da li ste sigurni da želite da rezervišete sledeći let?
+                Da li ste sigurni da zelite da rezervisete sledeci let?
               </p>
-              
+
               <div style={{
                 padding: 'var(--spacing-lg)',
                 background: 'var(--color-gray-50)',
@@ -270,12 +386,12 @@ export function FlightsPage() {
               }}>
                 <h4 style={{ marginBottom: 'var(--spacing-sm)' }}>{bookingModal.naziv}</h4>
                 <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', margin: 0 }}>
-                  {bookingModal.aerodrom_polaska} → {bookingModal.aerodrom_dolaska}
+                  {bookingModal.aerodrom_polaska} &rarr; {bookingModal.aerodrom_dolaska}
                 </p>
               </div>
-              
-              <div style={{ 
-                display: 'flex', 
+
+              <div style={{
+                display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 padding: 'var(--spacing-md)',
@@ -283,22 +399,58 @@ export function FlightsPage() {
                 borderRadius: 'var(--radius-md)'
               }}>
                 <span>Cena karte:</span>
-                <span style={{ 
-                  fontSize: 'var(--font-size-xl)', 
+                <span style={{
+                  fontSize: 'var(--font-size-xl)',
                   fontWeight: 'var(--font-weight-bold)',
                   color: 'var(--color-primary)'
                 }}>
                   {bookingModal.cena_karte.toFixed(2)} EUR
                 </span>
               </div>
-              
-              <p style={{ 
-                fontSize: 'var(--font-size-sm)', 
+
+              <p style={{
+                fontSize: 'var(--font-size-sm)',
                 color: 'var(--text-tertiary)',
                 marginTop: 'var(--spacing-md)'
               }}>
-                Vaše trenutno stanje: {Number(user?.stanje_racuna || 0).toFixed(2)} EUR
+                Vase trenutno stanje: {Number(user?.stanje_racuna || 0).toFixed(2)} EUR
               </p>
+            </div>
+          )}
+        </Modal>
+
+        {/* Cancel Flight Modal (Admin only) */}
+        <Modal
+          isOpen={!!cancelModal}
+          onClose={() => setCancelModal(null)}
+          title="Otkazivanje leta"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setCancelModal(null)}>
+                Nazad
+              </Button>
+              <Button variant="danger" onClick={handleCancelFlight} isLoading={isCancelling}>
+                Otkazi let
+              </Button>
+            </>
+          }
+        >
+          {cancelModal && (
+            <div>
+              <p style={{ marginBottom: 'var(--spacing-lg)' }}>
+                Da li ste sigurni da zelite da otkazete sledeci let? Svi korisnici koji su kupili karte bice obavesteni i sredstva ce im biti vracena.
+              </p>
+
+              <div style={{
+                padding: 'var(--spacing-lg)',
+                background: 'var(--color-gray-50)',
+                borderRadius: 'var(--radius-lg)',
+              }}>
+                <h4 style={{ marginBottom: 'var(--spacing-sm)' }}>{cancelModal.naziv}</h4>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', margin: 0 }}>
+                  {cancelModal.aerodrom_polaska} &rarr; {cancelModal.aerodrom_dolaska}
+                </p>
+              </div>
             </div>
           )}
         </Modal>

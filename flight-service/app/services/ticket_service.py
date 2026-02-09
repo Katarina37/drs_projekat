@@ -80,36 +80,45 @@ class TicketService:
         """
         Interna funkcija za obradu kupovine u zasebnom procesu.
         Simulira duže vreme obrade sa sleep.
-        
+
         Args:
             flight_id: ID leta
             user_id: ID korisnika
             price: Cena karte
         """
-        from app import create_app, db
-        
+        from app import create_app, db, socketio as app_socketio
+
         app = create_app()
         with app.app_context():
             try:
                 # Simulacija duže obrade (za testiranje)
                 time.sleep(3)
-                
+
                 # Ponovna provera dostupnosti
                 flight = Flight.query.get(flight_id)
                 if not flight or flight.status != FlightStatus.ODOBREN:
-                    self._notify_purchase_failed(user_id, 'Let više nije dostupan')
+                    app_socketio.emit('purchase_failed', {
+                        'user_id': user_id,
+                        'reason': 'Let više nije dostupan'
+                    }, namespace='/user')
                     return
-                
+
                 if flight.slobodna_mesta <= 0:
-                    self._notify_purchase_failed(user_id, 'Nema više slobodnih mesta')
+                    app_socketio.emit('purchase_failed', {
+                        'user_id': user_id,
+                        'reason': 'Nema više slobodnih mesta'
+                    }, namespace='/user')
                     return
-                
+
                 # Skidanje novca sa računa korisnika (poziv Server API)
                 deduct_success = self._deduct_user_balance(user_id, price)
                 if not deduct_success:
-                    self._notify_purchase_failed(user_id, 'Greška pri transakciji')
+                    app_socketio.emit('purchase_failed', {
+                        'user_id': user_id,
+                        'reason': 'Greška pri transakciji'
+                    }, namespace='/user')
                     return
-                
+
                 # Kreiranje karte
                 ticket = Ticket(
                     flight_id=flight_id,
@@ -118,13 +127,27 @@ class TicketService:
                 )
                 db.session.add(ticket)
                 db.session.commit()
-                
+
                 # Notifikacija o uspešnoj kupovini
-                self._notify_purchase_success(user_id, ticket.to_dict())
-                
+                app_socketio.emit('purchase_success', {
+                    'user_id': user_id,
+                    'ticket': ticket.to_dict()
+                }, namespace='/user')
+
+                # Obavesti FlightsPage da se slobodna mesta promenila
+                app_socketio.emit('ticket_purchased', {
+                    'flight': flight.to_dict() if hasattr(flight, 'to_dict') else {'id': flight.id}
+                }, namespace='/flights')
+
             except Exception as e:
                 print(f"[TICKET] Greška pri obradi kupovine: {str(e)}")
-                self._notify_purchase_failed(user_id, f'Greška: {str(e)}')
+                try:
+                    app_socketio.emit('purchase_failed', {
+                        'user_id': user_id,
+                        'reason': f'Greška: {str(e)}'
+                    }, namespace='/user')
+                except Exception:
+                    pass
     
     def _deduct_user_balance(self, user_id: int, amount: float) -> bool:
         """
@@ -150,22 +173,6 @@ class TicketService:
         except Exception as e:
             print(f"[TICKET] Greška pri skidanju sredstava: {str(e)}")
             return False
-    
-    def _notify_purchase_success(self, user_id: int, ticket_data: dict):
-        """Šalje notifikaciju o uspešnoj kupovini."""
-        if self.socketio:
-            self.socketio.emit('purchase_success', {
-                'user_id': user_id,
-                'ticket': ticket_data
-            }, namespace='/user')
-    
-    def _notify_purchase_failed(self, user_id: int, reason: str):
-        """Šalje notifikaciju o neuspešnoj kupovini."""
-        if self.socketio:
-            self.socketio.emit('purchase_failed', {
-                'user_id': user_id,
-                'reason': reason
-            }, namespace='/user')
     
     def get_user_tickets(self, user_id: int) -> List[Ticket]:
         """

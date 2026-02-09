@@ -29,7 +29,7 @@ export function Sidebar() {
     },
     {
       section: 'Menadžment',
-      roles: [UserRole.MENADZER, UserRole.ADMINISTRATOR],
+      roles: [UserRole.MENADZER],
       items: [
         { path: '/create-flight', label: 'Kreiraj let', icon: PlaneTakeoff },
         { path: '/my-flights', label: 'Moji letovi', icon: ClipboardList },

@@ -18,7 +18,7 @@ class AuthService:
 
     # Konstante za lockout
     MAX_FAILED_ATTEMPTS = 3
-    LOCKOUT_SECONDS = 20  # 20 sekundi za testiranje
+    LOCKOUT_SECONDS = int(os.getenv('LOCK_SECONDS', '60'))
 
     def __init__(self):
         """Inicijalizacija servisa sa Redis konekcijom."""

@@ -8,6 +8,7 @@ import {
   Modal,
   Table,
   Input,
+  SearchBar,
   Spinner,
   EmptyState,
 } from '../components';
@@ -39,6 +40,7 @@ export function AirlinesPage() {
   const [editing, setEditing] = useState<Airline | null>(null);
   const [formData, setFormData] = useState<AirlineFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadAirlines = useCallback(async () => {
     setIsLoading(true);
@@ -173,7 +175,42 @@ export function AirlinesPage() {
     }
   };
 
+  const filteredAirlines = airlines.filter((a) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      a.naziv.toLowerCase().includes(term) ||
+      a.kod.toLowerCase().includes(term) ||
+      (a.drzava && a.drzava.toLowerCase().includes(term))
+    );
+  });
+
   const columns = [
+    {
+      key: 'logo',
+      header: '',
+      render: (airline: Airline) =>
+        airline.logo ? (
+          <img
+            src={airline.logo}
+            alt={airline.naziv}
+            style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', objectFit: 'contain' }}
+          />
+        ) : (
+          <div style={{
+            width: 32,
+            height: 32,
+            borderRadius: 'var(--radius-sm)',
+            background: 'var(--color-gray-100)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-tertiary)',
+          }}>
+            <Building2 size={16} />
+          </div>
+        ),
+    },
     {
       key: 'naziv',
       header: 'Naziv',
@@ -181,15 +218,38 @@ export function AirlinesPage() {
     {
       key: 'kod',
       header: 'Kod',
+      render: (airline: Airline) => (
+        <span style={{
+          padding: '2px 8px',
+          background: 'var(--color-gray-100)',
+          borderRadius: 'var(--radius-sm)',
+          fontWeight: 'var(--font-weight-semibold)',
+          fontSize: 'var(--font-size-sm)',
+        }}>
+          {airline.kod}
+        </span>
+      ),
     },
     {
       key: 'drzava',
       header: 'Država',
+      render: (airline: Airline) => airline.drzava || '—',
     },
     {
       key: 'aktivna',
       header: 'Status',
-      render: (airline: Airline) => (airline.aktivna ? 'Aktivna' : 'Neaktivna'),
+      render: (airline: Airline) => (
+        <span style={{
+          padding: '2px 10px',
+          borderRadius: 'var(--radius-full)',
+          fontSize: 'var(--font-size-xs)',
+          fontWeight: 'var(--font-weight-semibold)',
+          background: airline.aktivna ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+          color: airline.aktivna ? '#16a34a' : '#dc2626',
+        }}>
+          {airline.aktivna ? 'Aktivna' : 'Neaktivna'}
+        </span>
+      ),
     },
     {
       key: 'actions',
@@ -233,19 +293,31 @@ export function AirlinesPage() {
           </div>
         </div>
 
+        <div className="filters-bar">
+          <SearchBar
+            placeholder="Pretraži avio kompanije..."
+            value={searchTerm}
+            onSearch={setSearchTerm}
+          />
+        </div>
+
         <Card>
           <CardBody style={{ padding: 0 }}>
             {isLoading ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--spacing-3xl)' }}>
                 <Spinner size="lg" />
               </div>
-            ) : airlines.length > 0 ? (
-              <Table columns={columns} data={airlines} keyExtractor={(airline) => airline.id} />
+            ) : filteredAirlines.length > 0 ? (
+              <Table columns={columns} data={filteredAirlines} keyExtractor={(airline) => airline.id} />
             ) : (
               <EmptyState
                 icon={<Building2 />}
                 title="Nema avio kompanija"
-                description="Dodajte prvu avio kompaniju kako biste mogli da kreirate letove."
+                description={
+                  searchTerm
+                    ? 'Nema kompanija koje odgovaraju vašoj pretrazi.'
+                    : 'Dodajte prvu avio kompaniju kako biste mogli da kreirate letove.'
+                }
               />
             )}
           </CardBody>

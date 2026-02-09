@@ -125,12 +125,12 @@ export function ProfilePage() {
       return;
     }
 
-    // Provjeri veličinu fajla (max 5 MB originalni fajl)
-    if (file.size > 5 * 1024 * 1024) {
+    // Provjeri veličinu fajla (max 10 MB originalni fajl)
+    if (file.size > 10 * 1024 * 1024) {
       addToast({
         type: 'error',
         title: 'Greška',
-        message: 'Slika je prevelika. Maksimalna veličina je 5 MB.',
+        message: 'Slika je prevelika. Maksimalna veličina je 10 MB.',
       });
       e.target.value = ''; // Reset input
       return;
@@ -379,8 +379,8 @@ export function ProfilePage() {
                           isImageLoading 
                             ? 'Učitavanje...' 
                             : formData.profilna_slika 
-                              ? 'Slika je učitana' 
-                              : 'Opcionalno (max 5 MB)'
+                              ? 'Slika je učitana'
+                              : 'Opcionalno (max 10 MB)'
                         }
                       />
                       {formData.profilna_slika && (

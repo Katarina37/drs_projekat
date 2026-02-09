@@ -1,22 +1,79 @@
-import { Plane, Clock, MapPin, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plane, Clock, MapPin, Users, Timer } from 'lucide-react';
 import type { Flight } from '../types';
+import { FlightStatus } from '../types';
 import { FlightStatusBadge } from './Badge';
 import { Button } from './Button';
 
 interface FlightCardProps {
   flight: Flight;
   onBook?: (flight: Flight) => void;
+  onCancel?: (flight: Flight) => void;
   onView?: (flight: Flight) => void;
   showActions?: boolean;
+  showCountdown?: boolean;
   actionLabel?: string;
+}
+
+function CountdownTimer({ targetDate }: { targetDate: string }) {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime();
+      const target = new Date(targetDate).getTime();
+      const diff = target - now;
+
+      if (diff <= 0) {
+        setTimeLeft('Zavrseno');
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      } else if (minutes > 0) {
+        setTimeLeft(`${minutes}m ${seconds}s`);
+      } else {
+        setTimeLeft(`${seconds}s`);
+      }
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+    return () => clearInterval(interval);
+  }, [targetDate]);
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '6px 12px',
+      background: 'rgba(234, 179, 8, 0.1)',
+      border: '1px solid rgba(234, 179, 8, 0.3)',
+      borderRadius: 'var(--radius-md)',
+      color: '#b45309',
+      fontWeight: 'var(--font-weight-semibold)',
+      fontSize: 'var(--font-size-sm)',
+    }}>
+      <Timer size={16} />
+      <span>Do kraja leta: {timeLeft}</span>
+    </div>
+  );
 }
 
 export function FlightCard({
   flight,
   onBook,
+  onCancel,
   onView,
   showActions = true,
-  actionLabel = 'Rezerviši',
+  showCountdown = false,
+  actionLabel = 'Rezervisi',
 }: FlightCardProps) {
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('sr-RS', {
@@ -38,6 +95,8 @@ export function FlightCard({
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
+  const isInProgress = flight.status === FlightStatus.U_TOKU;
+
   return (
     <div className="flight-card">
       <div className="flight-card-header">
@@ -49,6 +108,11 @@ export function FlightCard({
         </div>
         <FlightStatusBadge status={flight.status} />
       </div>
+
+      {/* Countdown timer za letove u toku */}
+      {(showCountdown || isInProgress) && flight.vreme_dolaska && (
+        <CountdownTimer targetDate={flight.vreme_dolaska} />
+      )}
 
       <div className="flight-route">
         <div className="flight-route-point">
@@ -96,6 +160,11 @@ export function FlightCard({
               {onView && (
                 <Button variant="secondary" size="sm" onClick={() => onView(flight)}>
                   Detalji
+                </Button>
+              )}
+              {onCancel && (
+                <Button variant="danger" size="sm" onClick={() => onCancel(flight)}>
+                  Otkazi
                 </Button>
               )}
               {onBook && flight.slobodna_mesta > 0 && (

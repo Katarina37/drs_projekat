@@ -91,6 +91,7 @@ export interface Flight {
   status: FlightStatus;
   kreirao_id: number;
   razlog_odbijanja?: string;
+  prosecna_ocena?: number;
   kreiran: string;
   azuriran?: string;
 }
