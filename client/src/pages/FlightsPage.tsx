@@ -330,6 +330,7 @@ export function FlightsPage() {
 
   const currentFlights = getCurrentFlights();
 
+  
   return (
     <>
       <TopHeader title="Letovi" />
