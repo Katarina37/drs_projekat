@@ -3,7 +3,7 @@ name: Build and Push Backend
 on:
   push:
     branches: [main]
-    paths: ['server/**', 'flight-service/**']
+    paths: ['server/**', 'flight-service/**'] # Pokreće se samo ako menjaš ove foldere
 
 jobs:
   build:
@@ -21,27 +21,23 @@ jobs:
           username: katarina37
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # PRVI SERVIS: Flight Service
       - name: Build and Push Flight Service
         uses: docker/build-push-action@v5
         with:
           context: ./flight-service
-          file: ./flight-service/.prod
+          file: ./flight-service/Dockerfile.prod
           push: true
           tags: ghcr.io/katarina37/flight-service:latest
 
-      # DRUGI SERVIS: Server
       - name: Build and Push Server
         uses: docker/build-push-action@v5
         with:
           context: ./server
-          file: ./server/.prod
+          file: ./server/Dockerfile.prod
           push: true
           tags: ghcr.io/katarina37/moj-server:latest
 
-      # AKTIVACIJA RENDERA (Dva odvojena poziva)
-      - name: Deploy Flight Service
-        run: curl -X GET ${{ secrets.RENDER_FLIGHT_DEPLOY_HOOK }}
-      
-      - name: Deploy Server
-        run: curl -X GET ${{ secrets.RENDER_SERVER_DEPLOY_HOOK }}
+      - name: Deploy to Render
+        run: |
+          curl -X GET ${{ secrets.RENDER_FLIGHT_DEPLOY_HOOK }}
+          curl -X GET ${{ secrets.RENDER_SERVER_DEPLOY_HOOK }}
