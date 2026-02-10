@@ -87,9 +87,9 @@ export function FlightsPage() {
         if (inProgressRes.success) setInProgressFlights(inProgressRes.data || []);
         if (finishedRes.success) setFinishedFlights(finishedRes.data || []);
       } catch {
-        // Tiho ignorisemo - nije kriticno
+
       }
-    }, 60000);
+    }, 2000); 
 
     return () => clearInterval(silentRefreshRef.current);
   }, []);

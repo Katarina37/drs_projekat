@@ -1,0 +1,11 @@
+# Dockerfile.dev (frontend)
+FROM node:16 AS development
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+
+RUN npm install
+
+COPY . .
+
+CMD ["npm", "run", "dev"]
