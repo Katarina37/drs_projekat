@@ -6,6 +6,7 @@ from sqlalchemy.dialects.mysql import LONGTEXT
 from app import db
 
 
+
 class UserRole(str, Enum):
     """Enum za korisničke uloge u sistemu."""
     KORISNIK = "KORISNIK"
