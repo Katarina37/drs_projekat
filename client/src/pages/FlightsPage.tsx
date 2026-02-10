@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plane, FileText } from 'lucide-react';
 import { TopHeader } from '../components/layout/TopHeader';
 import {
@@ -13,11 +13,12 @@ import {
   Card,
   CardBody
 } from '../components';
+import axios from 'axios';
 import { flightsApi, airlinesApi, ticketsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import type { Flight, Airline, TabItem } from '../types';
-import { UserRole } from '../types';
+import { UserRole, FlightStatus } from '../types';
 import { createSocket } from '../services/socket';
 
 export function FlightsPage() {
@@ -72,49 +73,95 @@ export function FlightsPage() {
     loadData();
   }, [loadData]);
 
-  // Ponovo ucitaj podatke kad korisnik promeni tab
+  // Tiho osvezavanje u pozadini (bez spinnera) kao fallback za propustene socket evente
+  const silentRefreshRef = useRef<ReturnType<typeof setInterval>>();
   useEffect(() => {
-    loadData();
-  }, [activeTab, loadData]);
+    silentRefreshRef.current = setInterval(async () => {
+      try {
+        const [upcomingRes, inProgressRes, finishedRes] = await Promise.all([
+          flightsApi.getUpcoming(),
+          flightsApi.getInProgress(),
+          flightsApi.getFinished(),
+        ]);
+        if (upcomingRes.success) setUpcomingFlights(upcomingRes.data || []);
+        if (inProgressRes.success) setInProgressFlights(inProgressRes.data || []);
+        if (finishedRes.success) setFinishedFlights(finishedRes.data || []);
+      } catch {
+        // Tiho ignorisemo - nije kriticno
+      }
+    }, 60000);
+
+    return () => clearInterval(silentRefreshRef.current);
+  }, []);
+
+  // Helper: ukloni let iz svih tabova po ID-u
+  const removeFlightFromAll = useCallback((flightId: number) => {
+    setUpcomingFlights(prev => prev.filter(f => f.id !== flightId));
+    setInProgressFlights(prev => prev.filter(f => f.id !== flightId));
+    setFinishedFlights(prev => prev.filter(f => f.id !== flightId));
+  }, []);
 
   useEffect(() => {
     const socket = createSocket('/flights');
 
     const handleApproved = (payload: { flight?: Flight }) => {
       if (payload?.flight) {
+        const flight = payload.flight;
         addToast({
           type: 'info',
           title: 'Novi let odobren',
-          message: payload.flight.naziv,
+          message: flight.naziv,
         });
+        removeFlightFromAll(flight.id);
+        setUpcomingFlights(prev => [flight, ...prev]);
       }
-      loadData();
     };
 
     const handleCancelled = (payload: { flight?: Flight }) => {
       if (payload?.flight) {
+        const flight = payload.flight;
         addToast({
           type: 'warning',
           title: 'Let otkazan',
-          message: payload.flight.naziv,
+          message: flight.naziv,
         });
+        removeFlightFromAll(flight.id);
+        setFinishedFlights(prev => [flight, ...prev]);
       }
-      loadData();
     };
 
     const handleStatusChanged = (payload: { flight?: Flight }) => {
       if (payload?.flight) {
+        const flight = payload.flight;
         addToast({
           type: 'info',
           title: 'Status leta promenjen',
-          message: `${payload.flight.naziv} - ${payload.flight.status}`,
+          message: `${flight.naziv} - ${flight.status}`,
         });
+        removeFlightFromAll(flight.id);
+        switch (flight.status) {
+          case FlightStatus.ODOBREN:
+            setUpcomingFlights(prev => [flight, ...prev]);
+            break;
+          case FlightStatus.U_TOKU:
+            setInProgressFlights(prev => [flight, ...prev]);
+            break;
+          case FlightStatus.ZAVRSEN:
+            setFinishedFlights(prev => [flight, ...prev]);
+            break;
+          case FlightStatus.OTKAZAN:
+            setFinishedFlights(prev => [flight, ...prev]);
+            break;
+        }
       }
-      loadData();
     };
 
-    const handleTicketPurchased = () => {
-      loadData();
+    const handleTicketPurchased = (payload: { flight?: Flight }) => {
+      if (payload?.flight) {
+        const updated = payload.flight;
+        setUpcomingFlights(prev => prev.map(f => f.id === updated.id ? updated : f));
+        setInProgressFlights(prev => prev.map(f => f.id === updated.id ? updated : f));
+      }
     };
 
     socket.on('flight_approved', handleApproved);
@@ -129,7 +176,7 @@ export function FlightsPage() {
       socket.off('ticket_purchased', handleTicketPurchased);
       socket.disconnect();
     };
-  }, [addToast, loadData]);
+  }, [addToast, removeFlightFromAll]);
 
   const filterFlights = (flights: Flight[]) => {
     return flights.filter((flight) => {
@@ -173,11 +220,15 @@ export function FlightsPage() {
           message: response.message || 'Nije moguce rezervisati let.',
         });
       }
-    } catch {
+    } catch (error) {
+      let message = 'Doslo je do greske prilikom rezervacije.';
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        message = error.response.data.message;
+      }
       addToast({
         type: 'error',
         title: 'Greska',
-        message: 'Doslo je do greske prilikom rezervacije.',
+        message,
       });
     } finally {
       setIsBooking(false);
@@ -206,11 +257,15 @@ export function FlightsPage() {
           message: response.message || 'Nije moguce otkazati let.',
         });
       }
-    } catch {
+    } catch (error) {
+      let message = 'Doslo je do greske prilikom otkazivanja leta.';
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        message = error.response.data.message;
+      }
       addToast({
         type: 'error',
         title: 'Greska',
-        message: 'Doslo je do greske prilikom otkazivanja leta.',
+        message,
       });
     } finally {
       setIsCancelling(false);
