@@ -25,6 +25,7 @@ class FlightService:
         """
         self.socketio = socketio
     
+    
     def create_flight(self, dto: CreateFlightDTO, manager_id: int) -> Tuple[bool, str, Optional[dict]]:
         """
         Kreira novi let (samo menadžer).

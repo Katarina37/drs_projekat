@@ -18,6 +18,7 @@ type FlightFormData = {
   ukupno_mesta: string;
 };
 
+
 const initialForm: FlightFormData = {
   naziv: '',
   airline_id: '',
@@ -50,7 +51,7 @@ export function CreateFlightPage() {
         addToast({
           type: 'error',
           title: 'Greška',
-          message: 'Nije moguće učitati avio kompanije.',
+          message: 'Nije mogućee učitati avio kompanije.',
         });
       } finally {
         setIsLoading(false);
