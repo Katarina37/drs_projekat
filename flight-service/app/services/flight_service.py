@@ -19,8 +19,8 @@ class FlightService:
     def __init__(self, socketio=None):
         """
         Inicijalizuje FlightService.
-        
-        Args:
+
+         Args:
             socketio: SocketIO instanca za real-time notifikacije
         """
         self.socketio = socketio
@@ -28,7 +28,7 @@ class FlightService:
     def create_flight(self, dto: CreateFlightDTO, manager_id: int) -> Tuple[bool, str, Optional[dict]]:
         """
         Kreira novi let (samo menadžer).
-        
+
         Args:
             dto: CreateFlightDTO sa podacima leta
             manager_id: ID menadžera koji kreira let
@@ -40,13 +40,12 @@ class FlightService:
         if errors:
             return False, ', '.join(errors), None
         
-        # Provera da li avio kompanija postoji
         airline = Airline.query.get(dto.airline_id)
         if not airline:
             return False, 'Avio kompanija nije pronađena', None
         
-        # Provera da vreme polaska nije u prošlosti
-        if dto.vreme_polaska < datetime.utcnow():
+        # PROMENA: Koristimo lokalno vreme kontejnera (Srbija)
+        if dto.vreme_polaska < datetime.now():
             return False, 'Vreme polaska ne može biti u prošlosti', None
         
         flight = Flight(
@@ -67,7 +66,6 @@ class FlightService:
             db.session.add(flight)
             db.session.commit()
             
-            # Real-time notifikacija administratoru
             if self.socketio:
                 self.socketio.emit('new_flight_pending', {
                     'flight': flight.to_dict()
@@ -124,24 +122,21 @@ class FlightService:
         if dto.ukupno_mesta is not None:
             flight.ukupno_mesta = dto.ukupno_mesta
         
-        # Ako je bio odbijen, vraćamo na čekanje
         if flight.status == FlightStatus.ODBIJEN:
             flight.status = FlightStatus.CEKA_ODOBRENJE
             flight.razlog_odbijanja = None
         
         try:
             db.session.commit()
-            
             if self.socketio:
                 self.socketio.emit('flight_updated', {
                     'flight': flight.to_dict()
                 }, namespace='/admin')
-            
             return True, 'Let uspešno ažuriran', flight.to_dict()
         except Exception as e:
             db.session.rollback()
             return False, f'Greška pri ažuriranju: {str(e)}', None
-    
+
     def approve_flight(self, dto: ApproveFlightDTO) -> Tuple[bool, str, Optional[dict]]:
         """
         Odobrava let (samo admin).
@@ -155,28 +150,43 @@ class FlightService:
         errors = dto.validate()
         if errors:
             return False, ', '.join(errors), None
-        
         flight = Flight.query.get(dto.flight_id)
-        if not flight:
-            return False, 'Let nije pronađen', None
-        
-        if flight.status != FlightStatus.CEKA_ODOBRENJE:
-            return False, 'Let nije u statusu čekanja odobrenja', None
+        if not flight or flight.status != FlightStatus.CEKA_ODOBRENJE:
+            return False, 'Nevalidan let za odobravanje', None
         
         flight.status = FlightStatus.ODOBREN
-        
         try:
             db.session.commit()
-            
             if self.socketio:
-                self.socketio.emit('flight_approved', {
-                    'flight': flight.to_dict()
-                }, namespace='/flights')
-            
+                self.socketio.emit('flight_approved', {'flight': flight.to_dict()}, namespace='/flights')
             return True, 'Let uspešno odobren', flight.to_dict()
         except Exception as e:
             db.session.rollback()
-            return False, f'Greška pri odobravanju: {str(e)}', None
+            return False, str(e), None
+
+    def cancel_flight(self, dto: CancelFlightDTO) -> Tuple[bool, str, Optional[dict], List[tuple]]:
+        """Otkazuje let."""
+        flight = Flight.query.get(dto.flight_id)
+        if not flight or flight.status != FlightStatus.ODOBREN:
+            return False, 'Samo odobreni letovi se mogu otkazati', None, []
+        
+        # PROMENA: Lokalno vreme
+        if flight.vreme_polaska < datetime.now():
+            return False, 'Let koji je već počeo se ne može otkazati', None, []
+        
+        flight.status = FlightStatus.OTKAZAN
+        tickets = Ticket.query.filter_by(flight_id=dto.flight_id, otkazana=False).all()
+        refunds = [(t.user_id, float(t.cena)) for t in tickets]
+        for t in tickets: t.otkazana = True
+        
+        try:
+            db.session.commit()
+            if self.socketio:
+                self.socketio.emit('flight_cancelled', {'flight': flight.to_dict()}, namespace='/flights')
+            return True, 'Let otkazan', flight.to_dict(), refunds
+        except Exception as e:
+            db.session.rollback()
+            return False, str(e), None, []
     
     def reject_flight(self, dto: RejectFlightDTO) -> Tuple[bool, str, Optional[dict]]:
         """
@@ -215,53 +225,6 @@ class FlightService:
             db.session.rollback()
             return False, f'Greška pri odbijanju: {str(e)}', None
     
-    def cancel_flight(self, dto: CancelFlightDTO) -> Tuple[bool, str, Optional[dict], List[tuple]]:
-        """
-        Otkazuje let (samo admin).
-        
-        Args:
-            dto: CancelFlightDTO
-            
-        Returns:
-            Tuple (success, message, flight_data, affected_user_ids_with_refunds)
-        """
-        errors = dto.validate()
-        if errors:
-            return False, ', '.join(errors), None, []
-        
-        flight = Flight.query.get(dto.flight_id)
-        if not flight:
-            return False, 'Let nije pronađen', None, []
-        
-        # Let se može otkazati samo ako je odobren i nije počeo/završen
-        if flight.status != FlightStatus.ODOBREN:
-            return False, 'Samo odobreni letovi se mogu otkazati', None, []
-        
-        if flight.vreme_polaska < datetime.utcnow():
-            return False, 'Let koji je već počeo se ne može otkazati', None, []
-        
-        flight.status = FlightStatus.OTKAZAN
-        
-        # Pronalaženje svih korisnika sa kupljenim kartama
-        tickets = Ticket.query.filter_by(flight_id=dto.flight_id, otkazana=False).all()
-        refunds = []
-        
-        for ticket in tickets:
-            refunds.append((ticket.user_id, float(ticket.cena)))
-            ticket.otkazana = True
-        
-        try:
-            db.session.commit()
-            
-            if self.socketio:
-                self.socketio.emit('flight_cancelled', {
-                    'flight': flight.to_dict()
-                }, namespace='/flights')
-            
-            return True, 'Let otkazan', flight.to_dict(), refunds
-        except Exception as e:
-            db.session.rollback()
-            return False, f'Greška pri otkazivanju: {str(e)}', None, []
     
     def delete_flight(self, flight_id: int) -> Tuple[bool, str]:
         """
@@ -309,15 +272,17 @@ class FlightService:
     
     def get_upcoming_flights(self) -> List[Flight]:
         """Vraća letove koji još nisu počeli."""
-        now = datetime.utcnow()
+        # PROMENA: Lokalno vreme
+        now = datetime.now()
         return Flight.query.filter(
             Flight.status == FlightStatus.ODOBREN,
             Flight.vreme_polaska > now
         ).order_by(Flight.vreme_polaska).all()
     
     def get_in_progress_flights(self) -> List[Flight]:
-        """Vraća letove koji su trenutno u toku."""
-        now = datetime.utcnow()
+        """Vraća letove koji su u toku."""
+        # PROMENA: Lokalno vreme
+        now = datetime.now()
         flights = Flight.query.filter(
             Flight.status.in_([FlightStatus.ODOBREN, FlightStatus.U_TOKU])
         ).all()
@@ -325,29 +290,25 @@ class FlightService:
         in_progress = []
         for flight in flights:
             if flight.vreme_polaska <= now < flight.vreme_dolaska:
-                # Ažuriraj status ako nije već
                 if flight.status != FlightStatus.U_TOKU:
                     flight.status = FlightStatus.U_TOKU
                     db.session.commit()
                 in_progress.append(flight)
-        
         return in_progress
     
     def get_finished_flights(self) -> List[Flight]:
-        """Vraća završene i otkazane letove."""
-        now = datetime.utcnow()
-        
-        # Ažuriraj status letova koji su se završili
-        finished_flights = Flight.query.filter(
+        """Vraća završene i ažurira status onih koji su prošli."""
+        # PROMENA: Lokalno vreme
+        now = datetime.now()
+        potential_finished = Flight.query.filter(
             Flight.status.in_([FlightStatus.ODOBREN, FlightStatus.U_TOKU])
         ).all()
         
-        for flight in finished_flights:
+        for flight in potential_finished:
             if flight.vreme_dolaska <= now:
                 flight.status = FlightStatus.ZAVRSEN
         
         db.session.commit()
-        
         return Flight.query.filter(
             Flight.status.in_([FlightStatus.ZAVRSEN, FlightStatus.OTKAZAN])
         ).order_by(Flight.vreme_polaska.desc()).all()

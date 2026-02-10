@@ -12,7 +12,7 @@ class Rating(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     ocena = db.Column(db.Integer, nullable=False)
     komentar = db.Column(db.Text, nullable=True)
-    kreirana = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    kreirana = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
     def to_dict(self):
         return {

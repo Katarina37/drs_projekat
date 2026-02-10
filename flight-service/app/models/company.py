@@ -12,7 +12,7 @@ class Company(db.Model):
     kod = db.Column(db.String(10), nullable=False)
     drzava = db.Column(db.String(100), nullable=True)
     aktivna = db.Column(db.Boolean, default=True, nullable=False)
-    kreirana = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    kreirana = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
     def to_dict(self):
         return {

@@ -19,8 +19,8 @@ class Config:
     
     SMTP_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com')
     SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-    SMTP_USER = os.getenv('SMTP_USER', '')
-    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
+    SMTP_USER = os.getenv('SMTP_USER', 'avioletovi5@gmail.com')
+    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', 'hsrq jvfz fpfl jibq')
     
     INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', 'internal-secret-key')
 

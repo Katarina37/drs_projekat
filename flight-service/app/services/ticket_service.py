@@ -48,7 +48,7 @@ class TicketService:
         if flight.status != FlightStatus.ODOBREN:
             return False, 'Karte se mogu kupiti samo za odobrene letove'
         
-        if flight.vreme_polaska < datetime.utcnow():
+        if flight.vreme_polaska < datetime.now():
             return False, 'Let je već počeo'
         
         if flight.slobodna_mesta <= 0:
@@ -220,7 +220,7 @@ class TicketService:
             return False, 'Karta je već otkazana'
         
         flight = ticket.let
-        if flight.vreme_polaska < datetime.utcnow():
+        if flight.vreme_polaska < datetime.now():
             return False, 'Ne možete otkazati kartu za let koji je već počeo'
         
         ticket.otkazana = True

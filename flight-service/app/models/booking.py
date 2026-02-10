@@ -12,7 +12,7 @@ class Booking(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     cena = db.Column(db.Numeric(10, 2), nullable=False)
     otkazana = db.Column(db.Boolean, default=False, nullable=False)
-    kreirana = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    kreirana = db.Column(db.DateTime, default=datetime.now, nullable=False)
     
     let = db.relationship('Flight', backref='booking_rezervacije')
 

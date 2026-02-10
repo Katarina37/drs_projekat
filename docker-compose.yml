@@ -8,6 +8,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: auth_db
+      TZ: Europe/Belgrade
     ports:
       - "3307:3306"
     volumes:
@@ -27,6 +28,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: flights_db
+      TZ: Europe/Belgrade
     ports:
       - "3308:3306"
     volumes:
@@ -53,6 +55,7 @@ services:
     build: ./server
     container_name: drs_server
     environment:
+      TZ: Europe/Belgrade
       AUTH_PORT: "5001"
       DB1_URL: "mysql+pymysql://root:root@db1:3306/auth_db"
       JWT_SECRET: "supersecret123"
@@ -61,8 +64,8 @@ services:
       REDIS_URL: "redis://redis:6379/0"
       SMTP_HOST: "smtp.gmail.com"
       SMTP_PORT: "587"
-      SMTP_USER: ""
-      SMTP_PASSWORD: ""
+      SMTP_USER: "avioletovi5@gmail.com"
+      SMTP_PASSWORD: "hsrq jvfz fpfl jibq"
     ports:
       - "5001:5001"
     depends_on:
@@ -78,6 +81,7 @@ services:
     build: ./flight-service
     container_name: drs_flight_service
     environment:
+      TZ: Europe/Belgrade
       FLIGHT_PORT: "5002"
       DB2_URL: "mysql+pymysql://root:root@db2:3306/flights_db"
       JWT_SECRET: "supersecret123"
@@ -86,8 +90,8 @@ services:
       INTERNAL_API_KEY: "internal-secret"
       SMTP_HOST: "smtp.gmail.com"
       SMTP_PORT: "587"
-      SMTP_USER: ""
-      SMTP_PASSWORD: ""
+      SMTP_USER: "avioletovi5@gmail.com"
+      SMTP_PASSWORD: "hsrq jvfz fpfl jibq"
     ports:
       - "5002:5002"
     depends_on:
@@ -105,6 +109,7 @@ services:
     build: ./client
     container_name: drs_client
     environment:
+      - TZ=Europe/Belgrade
       - DUMMY=1
     ports:
       - "5173:80"

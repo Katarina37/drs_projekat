@@ -29,7 +29,7 @@ class BookingService:
             return False, 'Rezervacija je već otkazana'
         
         flight = ticket.let
-        if flight.vreme_polaska < datetime.utcnow():
+        if flight.vreme_polaska < datetime.now():
             return False, 'Ne možete otkazati rezervaciju za let koji je već počeo'
         
         ticket.otkazana = True

@@ -28,7 +28,7 @@ class Airline(db.Model):
     logo = db.Column(db.Text, nullable=True)  # URL ili base64 logoa
     drzava = db.Column(db.String(100), nullable=True)
     aktivna = db.Column(db.Boolean, default=True, nullable=False)
-    kreirana = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    kreirana = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
     # Relacija sa letovima
     letovi = db.relationship('Flight', backref='avio_kompanija', lazy='dynamic')
@@ -86,8 +86,8 @@ class Flight(db.Model):
     ukupno_mesta = db.Column(db.Integer, default=100, nullable=False)
     
     # Vremenski podaci kreiranja i ažuriranja
-    kreiran = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    azuriran = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    kreiran = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    azuriran = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     # Relacija sa rezervacijama
     rezervacije = db.relationship('Ticket', backref='let', lazy='dynamic')
@@ -165,7 +165,7 @@ class Ticket(db.Model):
     otkazana = db.Column(db.Boolean, default=False, nullable=False)
     
     # Vremenski podaci
-    kupljena = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    kupljena = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
     def __repr__(self):
         return f'<Ticket {self.id} for Flight {self.flight_id}>'
@@ -207,7 +207,7 @@ class FlightRating(db.Model):
     komentar = db.Column(db.Text, nullable=True)
     
     # Vreme ocenjivanja
-    kreirana = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    kreirana = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
     # Jedinstven par (flight_id, user_id) - korisnik može oceniti let samo jednom
     __table_args__ = (

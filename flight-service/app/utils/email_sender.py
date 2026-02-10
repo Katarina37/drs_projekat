@@ -37,8 +37,8 @@ def _send_cancellation_emails(refunds: List[Tuple[int, float]], flight_data: dic
     internal_key = os.getenv('INTERNAL_API_KEY', 'internal-secret')
     smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
     smtp_port = int(os.getenv('SMTP_PORT', 587))
-    smtp_user = os.getenv('SMTP_USER', '')
-    smtp_password = os.getenv('SMTP_PASSWORD', '')
+    smtp_user = os.getenv('SMTP_USER', 'avioletovi5@gmail.com')
+    smtp_password = os.getenv('SMTP_PASSWORD', 'hsrq jvfz fpfl jibq')
 
     naziv_leta = flight_data.get('naziv', 'Nepoznat let')
     aerodrom_polaska = flight_data.get('aerodrom_polaska', '-')

@@ -136,8 +136,8 @@ def _send_report_email(to_email: str, name: str, report_type: str, pdf_content: 
     try:
         smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
         smtp_port = int(os.getenv('SMTP_PORT', 587))
-        smtp_user = os.getenv('SMTP_USER', '')
-        smtp_password = os.getenv('SMTP_PASSWORD', '')
+        smtp_user = os.getenv('SMTP_USER', 'avioletovi5@gmail.com')
+        smtp_password = os.getenv('SMTP_PASSWORD', 'hsrq jvfz fpfl jibq')
         
         if not smtp_user or not smtp_password:
             print(f'[REPORT] SMTP nije konfigurisan. Email nije poslat.')
