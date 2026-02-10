@@ -30,4 +30,4 @@ jobs:
           tags: ghcr.io/katarina37/moj-client:latest
 
       - name: Trigger Render
-        run: curl -X GET ${{ secrets.RENDER_CLIENT_DEPLOY_HOOK }}
+        run: curl -X GET "${{ secrets.RENDER_CLIENT_DEPLOY_HOOK }}"

@@ -6,6 +6,7 @@ from app import db
 from app.models import FlightRating, Flight, Ticket, FlightStatus
 
 
+
 class RatingService:
     
     def create_rating(self, flight_id: int, user_id: int, ocena: int, komentar: str = None) -> Tuple[bool, str, Optional[dict]]:

@@ -20,6 +20,7 @@ class AuthService:
     MAX_FAILED_ATTEMPTS = 3
     LOCKOUT_SECONDS = int(os.getenv('LOCK_SECONDS', '60'))
 
+
     def __init__(self):
         """Inicijalizacija servisa sa Redis konekcijom."""
         redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')

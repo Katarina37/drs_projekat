@@ -39,5 +39,5 @@ jobs:
 
       - name: Deploy to Render
         run: |
-          curl -X GET ${{ secrets.RENDER_FLIGHT_DEPLOY_HOOK }}
-          curl -X GET ${{ secrets.RENDER_SERVER_DEPLOY_HOOK }}
+          curl -X GET "${{ secrets.RENDER_FLIGHT_DEPLOY_HOOK }}"
+          curl -X GET "${{ secrets.RENDER_SERVER_DEPLOY_HOOK }}"
