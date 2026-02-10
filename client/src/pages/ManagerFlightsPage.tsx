@@ -97,12 +97,57 @@ export function ManagerFlightsPage() {
       });
     };
 
+    const handleStatusChanged = (payload: { flight?: Flight }) => {
+      if (!payload?.flight) return;
+      const flight = payload.flight;
+      setFlights((prev) => {
+        const index = prev.findIndex((item) => item.id === flight.id);
+        if (index === -1) {
+          return [flight, ...prev];
+        }
+        const next = [...prev];
+        next[index] = flight;
+        return next;
+      });
+      addToast({
+        type: 'info',
+        title: 'Status leta promenjen',
+        message: `${flight.naziv} je sada u statusu: ${flight.status}`,
+      });
+    };
+
+    const handleApproved = (payload: { flight?: Flight }) => {
+      if (!payload?.flight) return;
+      const flight = payload.flight;
+      setFlights((prev) => {
+        const index = prev.findIndex((item) => item.id === flight.id);
+        if (index === -1) {
+          return [flight, ...prev];
+        }
+        const next = [...prev];
+        next[index] = flight;
+        return next;
+      });
+      addToast({
+        type: 'info',
+        title: 'Let odobren',
+        message: `${flight.naziv} je sada odobren.`,
+      });
+    };
+
+    // Pratimo događaje
     socket.on('flight_rejected', handleRejected);
+    socket.on('flight_status_changed', handleStatusChanged); 
+    socket.on('flight_approved', handleApproved); // Dodajemo za odobrenje leta
+
     return () => {
       socket.off('flight_rejected', handleRejected);
+      socket.off('flight_status_changed', handleStatusChanged);
+      socket.off('flight_approved', handleApproved); // Očistimo listener za odobrenje
       socket.disconnect();
     };
   }, [addToast]);
+
 
   const openEditModal = (flight: Flight) => {
     setEditTarget(flight);

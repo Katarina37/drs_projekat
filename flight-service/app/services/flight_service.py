@@ -157,12 +157,23 @@ class FlightService:
         flight.status = FlightStatus.ODOBREN
         try:
             db.session.commit()
+            
+            # Emituj obavestenje ka menadžeru o odobrenju
             if self.socketio:
-                self.socketio.emit('flight_approved', {'flight': flight.to_dict()}, namespace='/flights')
+                self.socketio.emit('flight_approved', {'flight': flight.to_dict()}, namespace='/manager')  # Ovaj deo je novo
+            
+            # Emituj obavestenje na frontend za sve
+            if self.socketio:
+                self.socketio.emit('flight_status_changed', {
+                    'flight_id': flight.id,
+                    'status': flight.status.value  
+                }, namespace='/manager')
+            
             return True, 'Let uspešno odobren', flight.to_dict()
         except Exception as e:
             db.session.rollback()
             return False, str(e), None
+
 
     def cancel_flight(self, dto: CancelFlightDTO) -> Tuple[bool, str, Optional[dict], List[tuple]]:
         """Otkazuje let."""
