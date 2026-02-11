@@ -89,7 +89,7 @@ export function FlightsPage() {
       } catch {
         // Tiho ignorisemo - nije kriticno
       }
-    }, 20000);
+    }, 2000);
 
     return () => clearInterval(silentRefreshRef.current);
   }, []);
@@ -513,5 +513,3 @@ export function FlightsPage() {
     </>
   );
 }
-
-

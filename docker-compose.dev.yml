@@ -3,16 +3,17 @@ services:
     image: mysql:8.0
     container_name: drs_db1
     environment:
+      # Koristi varijablu iz .env, ako je nema stavi 'root'
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: auth_db
+      TZ: Europe/Belgrade
     ports:
       - "3307:3306"
     networks:
       - drs_network
-    # DODATO: Healthcheck da bi server znao kada je baza spremna
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -22,13 +23,14 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: flights_db
+      TZ: Europe/Belgrade
     ports:
       - "3308:3306"
     networks:
       - drs_network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -43,12 +45,15 @@ services:
       context: ./server
       dockerfile: Dockerfile.dev
     container_name: drs_server
+    # Učitava SVE iz tvog .env fajla direktno u OS environment kontejnera
     env_file:
       - .env
+    environment:
+      - TZ=Europe/Belgrade
     volumes:
       - ./server:/app
     ports:
-      - "${AUTH_PORT:-5000}:${AUTH_PORT:-5000}"
+      - "${AUTH_PORT}:${AUTH_PORT}"
     depends_on:
       db1:
         condition: service_healthy
@@ -62,10 +67,12 @@ services:
     container_name: drs_flight_service
     env_file:
       - .env
+    environment:
+      - TZ=Europe/Belgrade
     volumes:
       - ./flight-service:/app
     ports:
-      - "${FLIGHT_PORT:-5001}:${FLIGHT_PORT:-5001}"
+      - "${FLIGHT_PORT}:${FLIGHT_PORT}"
     depends_on:
       db2:
         condition: service_healthy
@@ -77,9 +84,11 @@ services:
       context: ./client
       dockerfile: Dockerfile.dev
     container_name: drs_client
+    environment:
+      - TZ=Europe/Belgrade
     volumes:
       - ./client:/app
-      - /app/node_modules # Ovo čuva npm pakete unutar kontejnera
+      - /app/node_modules
     ports:
       - "5173:5173"
     networks:
