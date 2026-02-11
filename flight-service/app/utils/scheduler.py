@@ -1,75 +1,51 @@
-# flight-service/app/utils/scheduler.py
-
 import threading
 import time
 from datetime import datetime
 
-
 def _check_flight_statuses(app, socketio):
-    """
-    Periodično proverava i ažurira statuse letova.
-    Pokreće se u zasebnom thread-u.
-    """
     from app import db
     from app.models import Flight, FlightStatus
+    
+    # Kreiramo potpuno novu izolovanu sesiju samo za ovaj krug provere
+    session = db.create_scoped_session()
 
-    with app.app_context():
-        try:
-            now = datetime.utcnow()
+    try:
+        now = datetime.utcnow()
+        
+        # Koristimo 'session' eksplicitno umesto 'Flight.query' ili 'db.session'
+        # 1. ODOBREN -> U_TOKU / ZAVRSEN
+        started_flights = session.query(Flight).filter(
+            Flight.status == FlightStatus.ODOBREN,
+            Flight.vreme_polaska <= now
+        ).all()
 
-            # ODOBREN -> U_TOKU (let je počeo)
-            started_flights = Flight.query.filter(
-                Flight.status == FlightStatus.ODOBREN,
-                Flight.vreme_polaska <= now
-            ).all()
+        for flight in started_flights:
+            if now < flight.vreme_dolaska:
+                flight.status = FlightStatus.U_TOKU
+            else:
+                flight.status = FlightStatus.ZAVRSEN
+            
+            if socketio:
+                socketio.emit('flight_status_changed', {'flight': flight.to_dict()}, namespace='/flights')
 
-            for flight in started_flights:
-                if now < flight.vreme_dolaska:
-                    flight.status = FlightStatus.U_TOKU
-                    print(f'[SCHEDULER] Let {flight.naziv} (ID:{flight.id}) -> U_TOKU')
-                    if socketio:
-                        socketio.emit('flight_status_changed', {
-                            'flight': flight.to_dict()
-                        }, namespace='/flights')
-                else:
-                    # Let je vec prosao i polazak i dolazak
-                    flight.status = FlightStatus.ZAVRSEN
-                    print(f'[SCHEDULER] Let {flight.naziv} (ID:{flight.id}) -> ZAVRSEN')
-                    if socketio:
-                        socketio.emit('flight_status_changed', {
-                            'flight': flight.to_dict()
-                        }, namespace='/flights')
+        # 2. U_TOKU -> ZAVRSEN
+        in_progress = session.query(Flight).filter(Flight.status == FlightStatus.U_TOKU).all()
 
-            # U_TOKU -> ZAVRSEN (let se završio)
-            finished_flights = Flight.query.filter(
-                Flight.status == FlightStatus.U_TOKU
-            ).all()
+        for flight in in_progress:
+            if flight.vreme_dolaska <= now:
+                flight.status = FlightStatus.ZAVRSEN
+                if socketio:
+                    socketio.emit('flight_status_changed', {'flight': flight.to_dict()}, namespace='/flights')
 
-            for flight in finished_flights:
-                if flight.vreme_dolaska <= now:
-                    flight.status = FlightStatus.ZAVRSEN
-                    print(f'[SCHEDULER] Let {flight.naziv} (ID:{flight.id}) -> ZAVRSEN')
-                    if socketio:
-                        socketio.emit('flight_status_changed', {
-                            'flight': flight.to_dict()
-                        }, namespace='/flights')
+        session.commit()
+        print(f"[SCHEDULER] Statusi ažurirani u {now}")
 
-            db.session.commit()
-
-        except Exception as e:
-            print(f'[SCHEDULER] Greška: {str(e)}')
-            db.session.rollback()
-
-
+    except Exception as e:
+        session.rollback()
+        print(f'[SCHEDULER] Kritična greška: {str(e)}')
+    finally:
+        session.remove()  # Gasi sesiju i vraća konekciju u pool
 def start_flight_scheduler(app, socketio, interval=30):
-    """
-    Pokreće periodičan scheduler za proveru statusa letova.
-
-    Args:
-        app: Flask aplikacija
-        socketio: SocketIO instanca
-        interval: Interval u sekundama između provera (default 30s)
-    """
     def run():
         print(f'[SCHEDULER] Pokrenut - interval {interval}s')
         while True:

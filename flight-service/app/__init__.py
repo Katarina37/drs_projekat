@@ -29,6 +29,12 @@ def create_app():
     # Konfiguracija
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DB2_URL', 'mysql+pymysql://root:root@localhost:3308/flights_db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        "pool_pre_ping": True,     # Proverava konekciju pre svakog upita
+        "pool_recycle": 280,      # Osvežava konekciju pre nego što je MySQL zatvori (default MySQL je 300s)
+        "pool_size": 10,
+        "max_overflow": 5
+    }
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET', 'supersecret123')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400  # 24 sata
     app.config['JWT_VERIFY_SUB'] = False

@@ -1,5 +1,5 @@
 # Dockerfile.dev (frontend)
-FROM node:16 AS development
+FROM node:20 AS development
 
 WORKDIR /app
 COPY package.json package-lock.json ./
