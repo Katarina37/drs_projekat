@@ -133,6 +133,7 @@ export function DashboardPage() {
 
 
 
+
           {/* Quick Actions & Info */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
             {/* Quick Actions */}

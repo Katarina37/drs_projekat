@@ -7,6 +7,7 @@ import time
 import requests
 import os
 
+
 from app import db
 from app.models import Flight, FlightStatus, Ticket
 from app.dto import BuyTicketDTO
