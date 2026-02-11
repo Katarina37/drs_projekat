@@ -8,6 +8,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
+
 # Učitavanje environment varijabli
 load_dotenv()
 

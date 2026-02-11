@@ -7,11 +7,12 @@ from app import db
 from app.models import Ticket, Flight, FlightStatus
 
 
+
 class BookingService:
     def get_all_bookings(self) -> List[Ticket]:
         return Ticket.query.all()
     
-    
+
     def get_bookings_by_flight(self, flight_id: int) -> List[Ticket]:
         return Ticket.query.filter_by(flight_id=flight_id).all()
     
