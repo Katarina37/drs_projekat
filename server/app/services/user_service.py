@@ -8,7 +8,6 @@ from app.models import User, UserRole
 from app.dto import UpdateUserDTO, ChangeRoleDTO, DepositDTO
 from app.utils import send_role_change_email, hash_password
 
-
 class UserService:
     """Servis za upravljanje korisnicima."""
     

@@ -19,6 +19,7 @@ import type { Airline, Flight } from '../types';
 import { FlightStatus } from '../types';
 import { createSocket } from '../services/socket';
 
+
 type FlightEditForm = {
   naziv: string;
   airline_id: string;
