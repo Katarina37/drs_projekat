@@ -24,8 +24,8 @@ def send_email_async(to_email: str, subject: str, body: str, attachment: Optiona
         attachment: Opcionalni attachment kao bytes
         attachment_name: Ime attachment fajla
     """
-   thread = Thread(target=_send_email, args=(to_email, subject, body, attachment, attachment_name))
-   thread.start()
+    p = Process(target=_send_email, args=(to_email, subject, body, attachment, attachment_name))
+    p.start()
 
 
 def _send_email(to_email: str, subject: str, body: str, attachment: Optional[bytes] = None, attachment_name: Optional[str] = None):
