@@ -181,3 +181,5 @@ def _send_report_email(to_email: str, name: str, report_type: str, pdf_content: 
         
     except Exception as e:
         print(f'[REPORT] Greška pri slanju emaila: {str(e)}')
+
+        
