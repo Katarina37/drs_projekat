@@ -19,3 +19,5 @@ if __name__ == '__main__':
     print(f'[FLIGHT-SERVICE] Starting on port {port}...')
     # Koristi eventlet za WebSocket podršku
     socketio.run(app, host='0.0.0.0', port=port, debug=debug)
+
+    

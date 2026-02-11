@@ -15,3 +15,5 @@ docker compose up --build
 
 Email: admin@admin.com  
 Lozinka: admin123
+
+
