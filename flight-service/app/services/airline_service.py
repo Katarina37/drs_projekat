@@ -113,3 +113,6 @@ class AirlineService:
         except Exception as e:
             db.session.rollback()
             return False, f'Greška pri brisanju: {str(e)}'
+
+
+            
