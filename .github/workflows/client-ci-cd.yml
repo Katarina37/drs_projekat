@@ -33,6 +33,7 @@ jobs:
           build-args: |
             VITE_API_URL=${{ secrets.VITE_API_URL }}
             VITE_FLIGHT_API_URL=${{ secrets.VITE_FLIGHT_API_URL }}
+            VITE_SOCKET_URL=${{ secrets.VITE_SOCKET_URL }}
 
       - name: Trigger Render
         run: curl -X GET "${{ secrets.RENDER_CLIENT_DEPLOY_HOOK }}"
