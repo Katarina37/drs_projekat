@@ -2,15 +2,12 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# 1. Instalacija zavisnosti
+# Prvo kopiramo requirements i instaliramo sve sa spiska
 COPY requirements.txt .
-# Instaliramo gunicorn i eventlet direktno da osiguramo njihovo prisustvo
-RUN pip install --no-cache-dir -r requirements.txt gunicorn eventlet
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 2. Kopiranje koda
+# Kopiramo ostatak koda
 COPY . .
 
-# 3. Pokretanje servisa
-# Koristimo varijablu $PORT koju si dodala u Render Environment
-# Obavezno dodajemo --worker-class eventlet jer tvoj run.py to zahteva
+# Pokretanje: Koristimo eventlet i varijablu $PORT (bez navodnika i zagrada)
 CMD gunicorn --worker-class eventlet --bind 0.0.0.0:$PORT run:app
