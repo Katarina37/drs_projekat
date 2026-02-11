@@ -4,21 +4,26 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# --- OVDE JE PROMENA ---
-# Moraš prihvatiti argumente iz YAML fajla
+# Prihvatanje argumenata iz YAML-a
 ARG VITE_API_URL
 ARG VITE_FLIGHT_API_URL
 
-# Moraš ih postaviti kao ENV da bi ih Vite video tokom build-a
+# Postavljanje ENV varijabli za Vite
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_FLIGHT_API_URL=$VITE_FLIGHT_API_URL
-# ----------------------
 
 COPY . .
 RUN npm run build
 
 # Druga faza: Production (Nginx)
 FROM nginx:stable-alpine
+
+# --- OVO SI ZABORAVILA I OVO JE KLJUČNO ---
+# Brišemo default i stavljamo tvoj nginx.conf (onaj bez proxy-ja)
+COPY nginx.conf /etc/nginx/conf.d/default.conf 
+
+# Kopiramo build fajlove u Nginx direktorijum
 COPY --from=build /app/dist /usr/share/nginx/html
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
