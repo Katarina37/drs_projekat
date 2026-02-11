@@ -11,3 +11,4 @@ COPY . .
 
 # Pokretanje: Koristimo eventlet i varijablu $PORT (bez navodnika i zagrada)
 CMD gunicorn --worker-class eventlet --bind 0.0.0.0:$PORT run:app
+

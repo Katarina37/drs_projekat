@@ -20,21 +20,30 @@ socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
 def create_app():
     """
     Factory funkcija za kreiranje Flask aplikacije.
-    
-    Returns:
-        Flask app instanca
     """
     app = Flask(__name__)
     
-    # Konfiguracija
+    # --- KONFIGURACIJA BAZE PODATAKA ---
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DB2_URL', 'mysql+pymysql://root:root@localhost:3308/flights_db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    
+    # DODAJ OVO: Sprečava "SSL error: decryption failed" kod Eventlet-a
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        "pool_pre_ping": True,     # Proverava konekciju pre svakog upita
-        "pool_recycle": 280,      # Osvežava konekciju pre nego što je MySQL zatvori (default MySQL je 300s)
-        "pool_size": 10,
-        "max_overflow": 5
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
     }
+
+    # --- KONFIGURACIJA ZA EMAIL (DODAJ OVO) ---
+    app.config['MAIL_SERVER'] = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+    app.config['MAIL_PORT'] = int(os.getenv('SMTP_PORT', 587))
+    app.config['MAIL_USE_TLS'] = True  # Ključno za port 587 i Render
+    app.config['MAIL_USE_SSL'] = False
+    app.config['MAIL_USERNAME'] = os.getenv('SMTP_USER')
+    app.config['MAIL_PASSWORD'] = os.getenv('SMTP_PASSWORD')
+    app.config['MAIL_DEFAULT_SENDER'] = os.getenv('SMTP_USER')
+    
+    # --- OSTALA PODEŠAVANJA ---
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET', 'supersecret123')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400  # 24 sata
     app.config['JWT_VERIFY_SUB'] = False
@@ -70,9 +79,8 @@ def create_app():
     with app.app_context():
         db.create_all()
         
-        # Kreiranje demo avio kompanija ako ne postoje
+        # Kreiranje demo avio kompanija
         from app.models import Airline
-        
         demo_airlines = [
             {'naziv': 'Air Serbia', 'kod': 'JU', 'drzava': 'Srbija'},
             {'naziv': 'Lufthansa', 'kod': 'LH', 'drzava': 'Nemačka'},
