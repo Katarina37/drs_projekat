@@ -1,5 +1,3 @@
-# server/app/utils/email.py
-
 import smtplib
 import time
 from email.mime.text import MIMEText
@@ -7,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from typing import Optional
 import os
-from multiprocessing import Process
+import threading # PROMENJENO: Korišćenje niti umesto procesa
 
 MAX_RETRIES = 3
 RETRY_DELAY = 5  # sekundi izmedju pokusaja
@@ -15,35 +13,28 @@ RETRY_DELAY = 5  # sekundi izmedju pokusaja
 
 def send_email_async(to_email: str, subject: str, body: str, attachment: Optional[bytes] = None, attachment_name: Optional[str] = None):
     """
-    Asinhrono slanje emaila korišćenjem procesa.
-    
-    Args:
-        to_email: Email adresa primaoca
-        subject: Naslov emaila
-        body: Telo emaila (HTML ili plain text)
-        attachment: Opcionalni attachment kao bytes
-        attachment_name: Ime attachment fajla
+    Asinhrono slanje emaila korišćenjem niti (Threading).
     """
-    p = Process(target=_send_email, args=(to_email, subject, body, attachment, attachment_name))
-    p.start()
+    # PROMENJENO: Thread deli resurse sa glavnom aplikacijom, što sprečava timeout na Renderu
+    t = threading.Thread(target=_send_email, args=(to_email, subject, body, attachment, attachment_name))
+    t.start()
 
 
 def _send_email(to_email: str, subject: str, body: str, attachment: Optional[bytes] = None, attachment_name: Optional[str] = None):
     """
     Interna funkcija za slanje emaila.
-    Izvršava se u zasebnom procesu.
+    Izvršava se u zasebnoj niti.
     """
     try:
         smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-        smtp_port = int(os.getenv('SMTP_PORT', 587))
+        # PROMENJENO: Port 465 i čišćenje lozinke
+        smtp_port = int(os.getenv('SMTP_PORT', 465))
         smtp_user = os.getenv('SMTP_USER', '')
-        smtp_password = os.getenv('SMTP_PASSWORD', '')
+        smtp_password = os.getenv('SMTP_PASSWORD', '').replace(" ", "")
         from_email = os.getenv('SMTP_FROM', smtp_user)
         
         if not smtp_user or not smtp_password:
             print(f"[EMAIL] SMTP nije konfigurisan. Email za {to_email} nije poslat.")
-            print(f"[EMAIL] Naslov: {subject}")
-            print(f"[EMAIL] Sadržaj: {body[:200]}...")
             return
         
         # Kreiranje poruke
@@ -64,8 +55,8 @@ def _send_email(to_email: str, subject: str, body: str, attachment: Optional[byt
         # Slanje emaila sa retry mehanizmom
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                with smtplib.SMTP(smtp_host, smtp_port) as server:
-                    server.starttls()
+                # PROMENJENO: SMTP_SSL umesto običnog SMTP sa starttls()
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as server:
                     server.login(smtp_user, smtp_password)
                     server.send_message(msg)
 
@@ -83,14 +74,6 @@ def _send_email(to_email: str, subject: str, body: str, attachment: Optional[byt
 
 
 def send_role_change_email(to_email: str, ime: str, nova_uloga: str):
-    """
-    Šalje email obaveštenje o promeni uloge.
-    
-    Args:
-        to_email: Email adresa korisnika
-        ime: Ime korisnika
-        nova_uloga: Nova uloga korisnika
-    """
     subject = "Promena uloge na platformi Avio Letovi"
     body = f"""
     <html>
@@ -109,16 +92,6 @@ def send_role_change_email(to_email: str, ime: str, nova_uloga: str):
 
 
 def send_flight_cancelled_email(to_email: str, ime: str, naziv_leta: str, aerodrom_polaska: str, aerodrom_dolaska: str):
-    """
-    Šalje email obaveštenje o otkazivanju leta.
-    
-    Args:
-        to_email: Email adresa korisnika
-        ime: Ime korisnika
-        naziv_leta: Naziv otkazanog leta
-        aerodrom_polaska: Aerodrom polaska
-        aerodrom_dolaska: Aerodrom dolaska
-    """
     subject = f"Let {naziv_leta} je otkazan"
     body = f"""
     <html>
@@ -142,15 +115,6 @@ def send_flight_cancelled_email(to_email: str, ime: str, naziv_leta: str, aerodr
 
 
 def send_report_email(to_email: str, ime: str, report_type: str, pdf_content: bytes):
-    """
-    Šalje PDF izvještaj na email.
-    
-    Args:
-        to_email: Email adresa primaoca
-        ime: Ime primaoca
-        report_type: Tip izvještaja (npr. "Aktivni letovi", "Završeni letovi")
-        pdf_content: Sadržaj PDF fajla kao bytes
-    """
     subject = f"Izvještaj: {report_type}"
     body = f"""
     <html>
