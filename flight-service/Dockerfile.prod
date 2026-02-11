@@ -10,4 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Pokretanje: Koristimo eventlet i varijablu $PORT (bez navodnika i zagrada)
-CMD gunicorn --worker-class eventlet --bind 0.0.0.0:$FLIGHT_PORT run:app
+CMD gunicorn --worker-class eventlet --bind 0.0.0.0:$PORT run:app

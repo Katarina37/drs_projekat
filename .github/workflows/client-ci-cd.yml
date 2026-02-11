@@ -29,9 +29,10 @@ jobs:
           file: ./client/Dockerfile.prod
           push: true
           tags: ghcr.io/katarina37/moj-client:latest
-          # Ključni deo: Prosleđivanje varijabli za produkciju
+          # OVDE SU IZMENE: Imena moraju biti ista kao u tvom api.ts fajlu
           build-args: |
-            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
-            VITE_FLIGHT_URL=${{ secrets.VITE_FLIGHT_URL }}
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_FLIGHT_API_URL=${{ secrets.VITE_FLIGHT_API_URL }}
+
       - name: Trigger Render
         run: curl -X GET "${{ secrets.RENDER_CLIENT_DEPLOY_HOOK }}"
