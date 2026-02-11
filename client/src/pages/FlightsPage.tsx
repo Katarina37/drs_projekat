@@ -87,9 +87,9 @@ export function FlightsPage() {
         if (inProgressRes.success) setInProgressFlights(inProgressRes.data || []);
         if (finishedRes.success) setFinishedFlights(finishedRes.data || []);
       } catch {
-
+        // Tiho ignorisemo - nije kriticno
       }
-    }, 2000); 
+    }, 20000);
 
     return () => clearInterval(silentRefreshRef.current);
   }, []);
@@ -330,7 +330,6 @@ export function FlightsPage() {
 
   const currentFlights = getCurrentFlights();
 
-  
   return (
     <>
       <TopHeader title="Letovi" />

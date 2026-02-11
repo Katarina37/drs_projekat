@@ -13,15 +13,12 @@ from app.dto import RegisterUserDTO, LoginDTO
 from app.utils import hash_password, verify_password
 
 
-
-
 class AuthService:
     """Service for user auth and registration."""
 
     # Konstante za lockout
     MAX_FAILED_ATTEMPTS = 3
     LOCKOUT_SECONDS = int(os.getenv('LOCK_SECONDS', '60'))
-
 
     def __init__(self):
         """Inicijalizacija servisa sa Redis konekcijom."""

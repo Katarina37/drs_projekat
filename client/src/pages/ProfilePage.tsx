@@ -16,7 +16,6 @@ import { useToast } from '../context/ToastContext';
 import { usersApi } from '../services/api';
 import type { User } from '../types';
 
-
 // Funkcija za kompresiju slike
 const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<string> => {
   return new Promise((resolve, reject) => {
