@@ -85,3 +85,5 @@ def create_app():
         print('[FLIGHT-SERVICE] Demo avio kompanije kreirane')
     
     return app
+
+
