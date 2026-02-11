@@ -18,6 +18,7 @@ import type { Flight } from '../types';
 import { createSocket } from '../services/socket';
 
 
+
 export function PendingFlightsPage() {
   const { addToast } = useToast();
   const [flights, setFlights] = useState<Flight[]>([]);
