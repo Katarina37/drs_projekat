@@ -1,8 +1,10 @@
+# flight-service/app/utils/email_sender.py
+
 import smtplib
 import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import threading # PROMENJENO: Korišćenje niti umesto procesa za Render
+from multiprocessing import Process
 from typing import List, Tuple
 import os
 import requests
@@ -22,24 +24,21 @@ def send_flight_cancelled_emails(refunds: List[Tuple[int, float]], flight_data: 
     if not refunds:
         return
 
-    # PROMENJENO: threading.Thread umesto Process za stabilniji rad na Renderu
-    thread = threading.Thread(
+    process = Process(
         target=_send_cancellation_emails,
         args=(refunds, flight_data)
     )
-    thread.start()
+    process.start()
 
 
 def _send_cancellation_emails(refunds: List[Tuple[int, float]], flight_data: dict):
-    """Interna funkcija za slanje emailova u zasebnoj niti."""
+    """Interna funkcija za slanje emailova u zasebnom procesu."""
     server_url = os.getenv('SERVER_URL', 'http://server:5001')
     internal_key = os.getenv('INTERNAL_API_KEY', 'internal-secret')
     smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-    # PROMENJENO: Port 465 za SSL
-    smtp_port = int(os.getenv('SMTP_PORT', 465))
+    smtp_port = int(os.getenv('SMTP_PORT', 587))
     smtp_user = os.getenv('SMTP_USER', 'avioletovi5@gmail.com')
-    # PROMENJENO: Automatsko uklanjanje razmaka iz lozinke
-    smtp_password = os.getenv('SMTP_PASSWORD', '').replace(" ", "")
+    smtp_password = os.getenv('SMTP_PASSWORD', 'hsrq jvfz fpfl jibq')
 
     naziv_leta = flight_data.get('naziv', 'Nepoznat let')
     aerodrom_polaska = flight_data.get('aerodrom_polaska', '-')
@@ -85,6 +84,7 @@ def _send_cancellation_emails(refunds: List[Tuple[int, float]], flight_data: dic
 
             if not smtp_user or not smtp_password:
                 print(f'[EMAIL] SMTP nije konfigurisan. Email za {user_email} nije poslat.')
+                print(f'[EMAIL] Naslov: {subject}')
                 continue
 
             msg = MIMEMultipart()
@@ -96,8 +96,8 @@ def _send_cancellation_emails(refunds: List[Tuple[int, float]], flight_data: dic
             sent = False
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
-                    # PROMENJENO: SMTP_SSL za direktnu enkripciju na portu 465
-                    with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as server:
+                    with smtplib.SMTP(smtp_host, smtp_port) as server:
+                        server.starttls()
                         server.login(smtp_user, smtp_password)
                         server.send_message(msg)
                     print(f'[EMAIL] Obavjestenje o otkazivanju poslato korisniku {user_email}')
@@ -113,3 +113,6 @@ def _send_cancellation_emails(refunds: List[Tuple[int, float]], flight_data: dic
 
         except Exception as e:
             print(f'[EMAIL] Greska pri slanju emaila korisniku {user_id}: {str(e)}')
+
+
+
