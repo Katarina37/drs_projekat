@@ -4,4 +4,4 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt gunicorn
 COPY . .
 # Pokrećemo preko Gunicorna (produkcijski standard sa tvog dijagrama)
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "run:app"]

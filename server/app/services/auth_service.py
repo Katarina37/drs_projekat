@@ -13,6 +13,7 @@ from app.dto import RegisterUserDTO, LoginDTO
 from app.utils import hash_password, verify_password
 
 
+
 class AuthService:
     """Service for user auth and registration."""
 
