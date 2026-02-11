@@ -7,5 +7,16 @@ const SOCKET_URL =
 
 export const createSocket = (namespace: string): Socket => {
   const normalized = namespace.startsWith('/') ? namespace : `/${namespace}`;
-  return io(`${SOCKET_URL}${normalized}`);
+  
+  // Spajamo URL i namespace, ali dodajemo konfiguracioni objekat
+  return io(`${SOCKET_URL}${normalized}`, {
+    // OVO JE KLJUČNO: Isključuje polling i koristi direktno WebSocket
+    transports: ['websocket'], 
+    upgrade: false,
+    // Osigurava da se koristi wss:// umesto ws:// na produkciji
+    secure: true, 
+    // Automatsko rekonektovanje ako pukne veza
+    reconnection: true,
+    reconnectionAttempts: 5
+  });
 };
