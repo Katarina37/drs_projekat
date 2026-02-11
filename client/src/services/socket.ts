@@ -20,3 +20,4 @@ export const createSocket = (namespace: string): Socket => {
     reconnectionAttempts: 5
   });
 };
+
