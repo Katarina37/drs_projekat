@@ -25,7 +25,7 @@ class FlightService:
         """
         self.socketio = socketio
     
-
+    
     def create_flight(self, dto: CreateFlightDTO, manager_id: int) -> Tuple[bool, str, Optional[dict]]:
         """
         Kreira novi let (samo menadžer).
@@ -426,4 +426,3 @@ class FlightService:
     def get_flight_by_id(self, flight_id: int) -> Optional[Flight]:
         """Vraća let po ID-u."""
         return Flight.query.get(flight_id)
-
