@@ -114,3 +114,5 @@ def _send_cancellation_emails(refunds: List[Tuple[int, float]], flight_data: dic
         except Exception as e:
             print(f'[EMAIL] Greska pri slanju emaila korisniku {user_id}: {str(e)}')
 
+
+
