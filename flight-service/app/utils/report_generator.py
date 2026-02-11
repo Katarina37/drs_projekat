@@ -174,15 +174,10 @@ def _send_report_email(to_email: str, name: str, report_type: str, pdf_content: 
         part['Content-Disposition'] = f'attachment; filename="{attachment_name}"'
         msg.attach(part)
         
-        # Pametna konekcija: bira SSL ili TLS u zavisnosti od porta
-        if smtp_port == 465:
-            server_instance = smtplib.SMTP_SSL(smtp_host, smtp_port)
-        else:
-            server_instance = smtplib.SMTP(smtp_host, smtp_port)
-            server_instance.starttls()
-
-        with server_instance as server:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
             server.login(smtp_user, smtp_password)
             server.send_message(msg)
+        
     except Exception as e:
         print(f'[REPORT] Greška pri slanju emaila: {str(e)}')

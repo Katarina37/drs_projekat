@@ -62,17 +62,10 @@ def _send_email(to_email: str, subject: str, body: str, attachment: Optional[byt
             msg.attach(part)
         
         # Slanje emaila sa retry mehanizmom
-        # Slanje emaila sa retry mehanizmom
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                # Pametna konekcija: SSL za port 465, TLS za ostale
-                if smtp_port == 465:
-                    server_instance = smtplib.SMTP_SSL(smtp_host, smtp_port)
-                else:
-                    server_instance = smtplib.SMTP(smtp_host, smtp_port)
-                    server_instance.starttls()
-
-                with server_instance as server:
+                with smtplib.SMTP(smtp_host, smtp_port) as server:
+                    server.starttls()
                     server.login(smtp_user, smtp_password)
                     server.send_message(msg)
 

@@ -96,22 +96,15 @@ def _send_cancellation_emails(refunds: List[Tuple[int, float]], flight_data: dic
             sent = False
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
-                    # Ova logika omogućava rad i lokalno (587) i na Renderu (465)
-                    if smtp_port == 465:
-                        server_instance = smtplib.SMTP_SSL(smtp_host, smtp_port)
-                    else:
-                        server_instance = smtplib.SMTP(smtp_host, smtp_port)
-                        server_instance.starttls()
-
-                    with server_instance as server:
+                    with smtplib.SMTP(smtp_host, smtp_port) as server:
+                        server.starttls()
                         server.login(smtp_user, smtp_password)
                         server.send_message(msg)
-                    
-                    print(f'[EMAIL] Obavjestenje poslato na {user_email}')
+                    print(f'[EMAIL] Obavjestenje o otkazivanju poslato korisniku {user_email}')
                     sent = True
                     break
                 except Exception as smtp_err:
-                    print(f'[EMAIL] Pokusaj {attempt}/{MAX_RETRIES} neuspesan: {str(smtp_err)}')
+                    print(f'[EMAIL] Pokusaj {attempt}/{MAX_RETRIES} neuspesan za {user_email}: {str(smtp_err)}')
                     if attempt < MAX_RETRIES:
                         time.sleep(RETRY_DELAY * attempt)
 
